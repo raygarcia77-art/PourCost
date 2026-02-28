@@ -660,6 +660,64 @@ input::placeholder{color:var(--muted);}
       </div>
 
       <hr class="divider">
+
+      <!-- Bar Transfers -->
+      <div class="section-header">
+        <div class="section-title">TRANSFER BETWEEN BARS</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Moves product between Desert Hawk and Low Horse — updates both bars automatically</div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:auto auto auto auto 1.5fr auto auto auto auto;gap:10px;align-items:end;margin-bottom:12px;">
+        <div class="form-group" style="margin:0;">
+          <label>From</label>
+          <select id="xfr-from" onchange="updateXfrTo()" style="font-family:var(--mono);font-size:12px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;">
+            <option value="dh">Desert Hawk</option>
+            <option value="lh">Low Horse</option>
+          </select>
+        </div>
+        <div style="font-family:var(--display);font-size:20px;color:var(--accent);padding-bottom:2px;align-self:end;">→</div>
+        <div class="form-group" style="margin:0;">
+          <label>To</label>
+          <div id="xfr-to-label" style="font-family:var(--mono);font-size:12px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:4px;white-space:nowrap;">Low Horse</div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Date</label>
+          <input type="date" id="xfr-date" style="font-size:12px;">
+        </div>
+        <div class="form-group" style="margin:0;position:relative;">
+          <label>Item</label>
+          <input type="text" id="xfr-item" placeholder="Start typing..." autocomplete="off"
+            oninput="xfrItemAutocomplete(this.value)"
+            style="font-size:12px;">
+          <div id="xfr-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:0 0 4px 4px;z-index:100;max-height:160px;overflow-y:auto;"></div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Category</label>
+          <select id="xfr-cat" style="font-size:12px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;">
+            <option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Qty</label>
+          <input type="number" id="xfr-qty" value="1" min="1" step="1" style="font-size:12px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Cost/Unit $</label>
+          <input type="number" id="xfr-cost" placeholder="0.00" step="0.01" style="font-size:12px;">
+          <div id="xfr-cost-hint" style="font-size:9px;font-family:var(--mono);color:var(--green);margin-top:2px;display:none;"></div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="addTransfer()" style="white-space:nowrap;">⇄ Transfer</button>
+        </div>
+      </div>
+
+      <!-- Transfer History -->
+      <div id="transfer-history-wrap" style="display:none;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;">RECENT TRANSFERS</div>
+        <div id="transfer-history-list"></div>
+      </div>
+
+      <hr class="divider">
       <div class="section-header"><div class="section-title">MANUAL ENTRY</div></div>
       <div class="form-grid" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 1fr auto;">
         <div class="form-group"><label>Date</label><input type="date" id="pur-date"></div>
@@ -1094,7 +1152,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[] };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[] };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -1353,7 +1411,7 @@ function switchTab(name) {
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='dashboard') renderDashboard();
   else if (name==='weekly') { renderWeeklyTable(); tryCarryForward(); autoFillPurchases(); }
-  else if (name==='purchases') { renderPurchasesTable(); renderRecentInvoices(); }
+  else if (name==='purchases') { renderPurchasesTable(); renderRecentInvoices(); renderTransferHistory(); }
   else if (name==='wastelog') renderWasteLog();
   else if (name==='depletion') renderDepletion();
   else if (name==='par') renderPar();
@@ -1465,9 +1523,23 @@ function deletePurchase(id){
 }
 
 function renderPurchasesTable(){
-  const tbody=document.getElementById('purchases-table-body'),purchases=S().purchases;
-  if(!purchases.length){tbody.innerHTML='<tr><td colspan="9" class="empty-state">No purchases recorded yet</td></tr>';return;}
-  tbody.innerHTML=[...purchases].reverse().map(p=>`<tr><td>${p.date}</td><td>${escHtml(p.item)}</td><td><span class="badge" style="background:rgba(212,168,67,0.1);color:var(--accent)">${p.cat}</span></td><td>${escHtml(p.vendor||'—')}</td><td class="num">${fmt$(p.cost)}</td><td class="num">${p.qty}</td><td class="num">${fmt$(p.total)}</td><td>${syncChip(p.synced)}</td><td><button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deletePurchase('${p.id}')">✕</button></td></tr>`).join('');
+  const tbody=document.getElementById('purchases-table-body');
+  const purchases=activeBar==='combined'?[]:S().purchases;
+  if(activeBar==='combined'){tbody.innerHTML='<tr><td colspan="9" class="empty-state">Switch to a specific bar to view purchases</td></tr>';return;}
+  if(!purchases||!purchases.length){tbody.innerHTML='<tr><td colspan="9" class="empty-state">No purchases recorded yet</td></tr>';return;}
+  tbody.innerHTML=[...purchases].reverse().map(p=>{
+    const isXfr=!!p.transferId, isOut=p.transferDir==='out';
+    const rowStyle=isXfr?`background:rgba(${isOut?'192,57,43':'39,174,96'},0.04);`:'';
+    const vendorHtml=isXfr
+      ?`<span style="font-size:10px;color:${isOut?'var(--accent2)':'var(--green)'};">${escHtml(p.vendor||'—')}</span>`
+      :escHtml(p.vendor||'—');
+    const costHtml=isOut?`<span style="color:var(--accent2);">${fmt$(p.cost)}</span>`:fmt$(p.cost);
+    const totalHtml=isOut?`<span style="color:var(--accent2);">${fmt$(p.total)}</span>`:fmt$(p.total);
+    const delBtn=isXfr
+      ?`<button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deleteTransfer('${p.transferId}')">✕</button>`
+      :`<button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deletePurchase('${p.id}')">✕</button>`;
+    return`<tr style="${rowStyle}"><td>${p.date}</td><td>${escHtml(p.item)}</td><td><span class="badge" style="background:rgba(212,168,67,0.1);color:var(--accent)">${p.cat}</span></td><td>${vendorHtml}</td><td class="num">${costHtml}</td><td class="num">${p.qty}</td><td class="num">${totalHtml}</td><td>${syncChip(p.synced)}</td><td>${delBtn}</td></tr>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════
@@ -2908,8 +2980,188 @@ function renderCategoryBreakdown() {
 }
 
 // ══════════════════════════════════════════════
-// RECENT INVOICES
+// BAR TRANSFERS
 // ══════════════════════════════════════════════
+function updateXfrTo() {
+  const from = document.getElementById('xfr-from')?.value;
+  const toLabel = document.getElementById('xfr-to-label');
+  if (toLabel) toLabel.textContent = from==='dh' ? 'Low Horse' : 'Desert Hawk';
+}
+
+function xfrItemAutocomplete(val) {
+  const box = document.getElementById('xfr-autocomplete');
+  if (!box) return;
+  if (!val || val.length < 2) { box.style.display='none'; return; }
+
+  // Search price history from both bars for matching items
+  const seen = new Set();
+  const matches = [];
+  ['dh','lh'].forEach(b => {
+    Object.values(states[b].priceHistory||{}).forEach(ph => {
+      const key = ph.item.toLowerCase();
+      if (key.includes(val.toLowerCase()) && !seen.has(key)) {
+        seen.add(key);
+        matches.push({ item: ph.item, cat: ph.cat,
+          cost: ph.history.length ? ph.history[ph.history.length-1].cost : 0 });
+      }
+    });
+  });
+
+  if (!matches.length) { box.style.display='none'; return; }
+
+  box.style.display = 'block';
+  box.innerHTML = matches.slice(0,8).map(m =>
+    `<div style="padding:7px 10px;cursor:pointer;font-size:12px;font-family:var(--mono);border-bottom:1px solid var(--border);"
+       onmousedown="selectXfrItem('${escHtml(m.item)}','${m.cat}',${m.cost})"
+       onmouseover="this.style.background='rgba(212,168,67,0.1)'"
+       onmouseout="this.style.background=''">
+      <span>${escHtml(m.item)}</span>
+      <span style="float:right;color:var(--muted);font-size:10px;">${m.cat} · ${fmt$(m.cost)}</span>
+    </div>`
+  ).join('');
+}
+
+function selectXfrItem(item, cat, cost) {
+  const itemEl = document.getElementById('xfr-item');
+  const catEl  = document.getElementById('xfr-cat');
+  const costEl = document.getElementById('xfr-cost');
+  const hintEl = document.getElementById('xfr-cost-hint');
+  const box    = document.getElementById('xfr-autocomplete');
+  if (itemEl) itemEl.value = item;
+  if (catEl)  { for(let o of catEl.options) if(o.value===cat) { o.selected=true; break; } }
+  if (costEl && cost>0) {
+    costEl.value = cost.toFixed(2);
+    if (hintEl) { hintEl.style.display='block'; hintEl.textContent=`↑ Auto-filled from price history`; }
+  }
+  if (box) box.style.display='none';
+}
+
+function addTransfer() {
+  const fromBar = document.getElementById('xfr-from').value;
+  const toBar   = fromBar==='dh' ? 'lh' : 'dh';
+  const date    = document.getElementById('xfr-date').value || new Date().toISOString().slice(0,10);
+  const item    = document.getElementById('xfr-item').value.trim();
+  const cat     = document.getElementById('xfr-cat').value;
+  const qty     = parseInt(document.getElementById('xfr-qty').value)||1;
+  const cost    = parseFloat(document.getElementById('xfr-cost').value)||0;
+
+  if (!item) { showToast('Enter an item name', true); return; }
+  if (!cost) { showToast('Enter a cost per unit', true); return; }
+
+  const total = cost * qty;
+  const xfrId = 'xfr_' + Date.now();
+  const fromName = BARS[fromBar].name;
+  const toName   = BARS[toBar].name;
+
+  // Transfer Out — negative purchase at sending bar
+  states[fromBar].purchases.push({
+    id: xfrId+'_out',
+    date, item, cat,
+    cost: -cost,        // negative = deduction
+    qty,
+    total: -total,
+    vendor: `Transfer → ${toName}`,
+    transferId: xfrId,
+    transferDir: 'out',
+    synced: false
+  });
+
+  // Transfer In — positive purchase at receiving bar
+  states[toBar].purchases.push({
+    id: xfrId+'_in',
+    date, item, cat,
+    cost,
+    qty,
+    total,
+    vendor: `Transfer ← ${fromName}`,
+    transferId: xfrId,
+    transferDir: 'in',
+    synced: false
+  });
+
+  // Record transfer in both bars for history display
+  const xfrRecord = { id:xfrId, date, item, cat, qty, cost, total, fromBar, toBar, synced:false };
+  if (!states[fromBar].transfers) states[fromBar].transfers=[];
+  if (!states[toBar].transfers)   states[toBar].transfers=[];
+  states[fromBar].transfers.push(xfrRecord);
+  states[toBar].transfers.push(xfrRecord);
+
+  // Update price history at receiving bar
+  const savedActive = activeBar;
+  activeBar = toBar;
+  updatePriceHistory(item, cat, cost, date);
+  activeBar = savedActive;
+
+  saveLocal();
+  renderPurchasesTable();
+  renderTransferHistory();
+  scheduleSync();
+
+  // Clear form
+  document.getElementById('xfr-item').value='';
+  document.getElementById('xfr-qty').value='1';
+  document.getElementById('xfr-cost').value='';
+  const hintEl=document.getElementById('xfr-cost-hint');
+  if(hintEl) hintEl.style.display='none';
+  document.getElementById('xfr-autocomplete').style.display='none';
+
+  showToast(`✓ ${qty}× ${item} transferred ${fromName} → ${toName} · ${fmt$(total)}`);
+}
+
+function renderTransferHistory() {
+  const wrap = document.getElementById('transfer-history-wrap');
+  const list = document.getElementById('transfer-history-list');
+  if (!wrap || !list) return;
+
+  // Gather transfers from both bars, deduplicate by id
+  const seen = new Set();
+  const transfers = [];
+  ['dh','lh'].forEach(b => {
+    (states[b].transfers||[]).forEach(t => {
+      if (!seen.has(t.id)) { seen.add(t.id); transfers.push(t); }
+    });
+  });
+
+  if (!transfers.length) { wrap.style.display='none'; return; }
+
+  wrap.style.display = 'block';
+  const sorted = [...transfers].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+
+  list.innerHTML = sorted.map(t => {
+    const dateStr = new Date(t.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const fromName = BARS[t.fromBar]?.name||t.fromBar;
+    const toName   = BARS[t.toBar]?.name||t.toBar;
+    return `<div style="display:flex;align-items:center;gap:14px;padding:9px 14px;background:var(--surface);border:1px solid var(--border);border-radius:5px;margin-bottom:6px;flex-wrap:wrap;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:80px;">${dateStr}</div>
+      <div style="font-size:13px;font-weight:500;flex:1;min-width:140px;">${escHtml(t.item)}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">${t.cat}</div>
+      <div style="font-family:var(--mono);font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="color:#c0841a;">${escHtml(fromName)}</span>
+        <span style="color:var(--accent);">→</span>
+        <span style="color:#9b6abf;">${escHtml(toName)}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted);">${t.qty} × ${fmt$(t.cost)}</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:600;">${fmt$(t.total)}</div>
+      <button onclick="deleteTransfer('${t.id}')"
+        style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px;margin-left:auto;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteTransfer(xfrId) {
+  if (!confirm('Delete this transfer? This will remove both the Transfer In and Transfer Out entries.')) return;
+  ['dh','lh'].forEach(b => {
+    states[b].purchases = (states[b].purchases||[]).filter(p=>p.transferId!==xfrId);
+    states[b].transfers = (states[b].transfers||[]).filter(t=>t.id!==xfrId);
+  });
+  saveLocal();
+  renderPurchasesTable();
+  renderTransferHistory();
+  scheduleSync();
+  showToast('Transfer deleted');
+}
+
+
 function renderRecentInvoices() {
   const el = document.getElementById('recent-invoices-list');
   if (!el || activeBar==='combined') {
@@ -3929,6 +4181,8 @@ function initApp(){
   document.getElementById('week-picker').value=wkStr;document.getElementById('entry-week').value=wkStr;
   document.getElementById('pur-date').value=now.toISOString().slice(0,10);
   document.getElementById('wc-date').value=now.toISOString().slice(0,10);
+  const xfrDateEl=document.getElementById('xfr-date');
+  if(xfrDateEl) xfrDateEl.value=now.toISOString().slice(0,10);
   document.getElementById('dep-week').value=wkStr;
   document.getElementById('currentWeekLabel').textContent='Week of '+getWeekLabel(wkStr);
   ['entry-start','entry-purchases','entry-end','entry-sales'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updatePreview);});
