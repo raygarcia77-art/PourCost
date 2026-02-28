@@ -1298,12 +1298,13 @@ function skipSetup() {
 // ══════════════════════════════════════════════
 async function gasRequest(params) {
   if (!config.scriptUrl) throw new Error('Not configured — add your Apps Script URL in Settings');
-  const url = config.scriptUrl + '?' + new URLSearchParams(params).toString();
-  const res = await fetch(url, {redirect:'follow'});
+  // Apps Script redirects POST to GET, so we send data as a query param
+  const url = config.scriptUrl + '?body=' + encodeURIComponent(JSON.stringify(params));
+  const res = await fetch(url, { method: 'GET', redirect: 'follow' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Script error');
-  return data;
+  if (data.status !== 'ok') throw new Error(data.error || data.message || 'Script error');
+  return data.data !== undefined ? data.data : data;
 }
 
 async function gasWrite(sheetName, rows) {
