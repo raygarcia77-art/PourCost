@@ -678,10 +678,20 @@ input::placeholder{color:var(--muted);}
 
     <!-- ── PRICE TRACKER ── -->
     <div class="panel" id="panel-prices">
-      <div class="section-header"><div class="section-title">PRICE TRACKER — <span id="prices-bar-name" style="color:var(--accent)">DESERT HAWK</span></div></div>
+      <div class="section-header"><div class="section-title">PRICE TRACKER — <span id="prices-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click any row to view price history chart</div>
+      </div>
       <div class="table-wrap">
-        <table><thead><tr><th>Product</th><th>Category</th><th>Current Price</th><th>Previous Price</th><th>Change</th><th>Last Updated</th><th>All-Time Low</th><th>All-Time High</th></tr></thead>
-        <tbody id="prices-table-body"><tr><td colspan="8" class="empty-state">Add purchases to track price history</td></tr></tbody></table>
+        <table><thead><tr><th>Product</th><th>Category</th><th>Current Price</th><th>Previous Price</th><th>Change</th><th>Since First Purchase</th><th>Last Updated</th><th>All-Time Low</th><th>All-Time High</th><th>Data Points</th></tr></thead>
+        <tbody id="prices-table-body"><tr><td colspan="10" class="empty-state">Add purchases to track price history</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- Price History Modal -->
+    <div id="price-history-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closePriceModal()">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:min(720px,95vw);max-height:90vh;overflow-y:auto;padding:24px;position:relative;">
+        <button onclick="closePriceModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">✕</button>
+        <div id="price-modal-content"></div>
       </div>
     </div>
 
@@ -1422,17 +1432,18 @@ function renderPurchasesTable(){
 // ══════════════════════════════════════════════
 // PRICE HISTORY
 // ══════════════════════════════════════════════
-function updatePriceHistory(item,cat,cost,date){
+function updatePriceHistory(item,cat,cost,date,invoiceNumber){
   const st = activeBar==='combined'?states.dh:S();
   const key=item.toLowerCase().trim();
   if(!st.priceHistory[key]){
     st.priceHistory[key]={item,cat,history:[]};
   } else {
-    // Always update category to the most recently confirmed value
     st.priceHistory[key].cat = cat;
   }
   if(cost>0) {
-    st.priceHistory[key].history.push({cost,date});
+    const entry = {cost,date};
+    if(invoiceNumber) entry.invoiceNumber = invoiceNumber;
+    st.priceHistory[key].history.push(entry);
     st.priceHistory[key].history.sort((a,b)=>a.date.localeCompare(b.date));
   }
 }
@@ -1452,11 +1463,201 @@ function learnCategory(itemName, cat) {
 function renderPrices(){
   const st = activeBar==='combined'?null:S();
   const tbody=document.getElementById('prices-table-body');
-  if(!st){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Switch to a specific bar to view price history</td></tr>';return;}
+  if(!st){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Switch to a specific bar to view price history</td></tr>';return;}
   const keys=Object.keys(st.priceHistory);
-  if(!keys.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Add purchases to track price history</td></tr>';return;}
-  tbody.innerHTML=keys.map(k=>{const ph=st.priceHistory[k],hist=ph.history,current=hist[hist.length-1].cost,prev=hist.length>1?hist[hist.length-2].cost:null,low=Math.min(...hist.map(h=>h.cost)),high=Math.max(...hist.map(h=>h.cost));let chg='—';if(prev!==null){const d=current-prev;chg=`<span class="${d>0?'price-up':'price-down'}">${d>0?'▲':'▼'} ${fmt$(Math.abs(d))}</span>`;}return`<tr><td>${escHtml(ph.item)}</td><td>${ph.cat}</td><td class="num">${fmt$(current)}</td><td class="num">${prev!==null?fmt$(prev):'—'}</td><td>${chg}</td><td>${hist[hist.length-1].date}</td><td class="num" style="color:var(--green)">${fmt$(low)}</td><td class="num" style="color:var(--accent2)">${fmt$(high)}</td></tr>`;}).join('');
+  if(!keys.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Add purchases to track price history</td></tr>';return;}
+  tbody.innerHTML=keys.map(k=>{
+    const ph=st.priceHistory[k],hist=ph.history;
+    const current=hist[hist.length-1].cost;
+    const prev=hist.length>1?hist[hist.length-2].cost:null;
+    const first=hist[0].cost;
+    const low=Math.min(...hist.map(h=>h.cost));
+    const high=Math.max(...hist.map(h=>h.cost));
+    let chg='—';
+    if(prev!==null){const d=current-prev;chg=`<span class="${d>0?'price-up':'price-down'}">${d>0?'▲':'▼'} ${fmt$(Math.abs(d))}</span>`;}
+    let sinceFirst='—';
+    if(hist.length>1){
+      const d=current-first;
+      const pct=first>0?((d/first)*100).toFixed(1):'0';
+      sinceFirst=`<span class="${d>0?'price-up':d<0?'price-down':''}">${d>0?'+':''}${fmt$(d)} (${d>0?'+':''}${pct}%)</span>`;
+    }
+    return`<tr style="cursor:pointer;" onclick="openPriceModal('${escHtml(k)}')" title="Click to view price history chart">
+      <td>${escHtml(ph.item)}</td>
+      <td>${ph.cat}</td>
+      <td class="num">${fmt$(current)}</td>
+      <td class="num">${prev!==null?fmt$(prev):'—'}</td>
+      <td>${chg}</td>
+      <td>${sinceFirst}</td>
+      <td>${hist[hist.length-1].date}</td>
+      <td class="num" style="color:var(--green)">${fmt$(low)}</td>
+      <td class="num" style="color:var(--accent2)">${fmt$(high)}</td>
+      <td class="num" style="color:var(--muted)">${hist.length}</td>
+    </tr>`;
+  }).join('');
 }
+
+function openPriceModal(key) {
+  const st = S();
+  const ph = st.priceHistory[key];
+  if (!ph || !ph.history.length) return;
+
+  const hist = [...ph.history].sort((a,b)=>a.date.localeCompare(b.date));
+  const prices = hist.map(h=>h.cost);
+  const minP = Math.min(...prices) * 0.95;
+  const maxP = Math.max(...prices) * 1.05;
+  const first = prices[0], current = prices[prices.length-1];
+  const totalChg = current - first;
+  const totalPct = first>0 ? ((totalChg/first)*100).toFixed(1) : '0';
+  const avg = (prices.reduce((s,p)=>s+p,0)/prices.length).toFixed(2);
+
+  // Build SVG chart
+  const W=620, H=200, PAD={top:20,right:20,bottom:40,left:55};
+  const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+
+  const xScale = i => PAD.left + (hist.length>1 ? (i/(hist.length-1))*cW : cW/2);
+  const yScale = p => PAD.top + cH - ((p-minP)/(maxP-minP))*cH;
+
+  // Line path
+  const linePts = hist.map((h,i)=>`${xScale(i).toFixed(1)},${yScale(h.cost).toFixed(1)}`).join(' ');
+  const areaPath = hist.length>1
+    ? `M${xScale(0).toFixed(1)},${(PAD.top+cH).toFixed(1)} ` +
+      hist.map((h,i)=>`L${xScale(i).toFixed(1)},${yScale(h.cost).toFixed(1)}`).join(' ') +
+      ` L${xScale(hist.length-1).toFixed(1)},${(PAD.top+cH).toFixed(1)} Z`
+    : '';
+
+  // Y axis labels
+  const yTicks = 4;
+  const yLabels = Array.from({length:yTicks+1},(_,i)=>{
+    const v = minP + (maxP-minP)*(i/yTicks);
+    const y = yScale(v);
+    return `<text x="${PAD.left-6}" y="${y.toFixed(1)}" text-anchor="end" font-size="10" fill="#888" dominant-baseline="middle">$${v.toFixed(2)}</text>
+            <line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${W-PAD.right}" y2="${y.toFixed(1)}" stroke="#333" stroke-width="0.5"/>`;
+  }).join('');
+
+  // X axis labels (show up to 6)
+  const xStep = Math.max(1, Math.floor(hist.length/6));
+  const xLabels = hist.map((h,i)=>{
+    if(i%xStep!==0 && i!==hist.length-1) return '';
+    const d = new Date(h.date+'T12:00:00');
+    const label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<text x="${xScale(i).toFixed(1)}" y="${(PAD.top+cH+14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#888">${label}</text>`;
+  }).join('');
+
+  // Data points with color coding
+  const dots = hist.map((h,i)=>{
+    const prev = i>0 ? hist[i-1].cost : h.cost;
+    const isUp = h.cost > prev + 0.005;
+    const isDown = h.cost < prev - 0.005;
+    const color = i===0 ? '#888' : isUp ? '#e74c3c' : isDown ? '#2ecc71' : '#d4a843';
+    const invLabel = h.invoiceNumber ? `Inv #${h.invoiceNumber}` : '';
+    const dateStr = new Date(h.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const cx = xScale(i).toFixed(1), cy = yScale(h.cost).toFixed(1);
+    // Tooltip via title
+    const tip = `${dateStr} · $${h.cost.toFixed(2)}${invLabel?' · '+invLabel:''}${isUp?' ▲ PRICE INCREASE':isDown?' ▼ price decrease':''}`;
+    return `<circle cx="${cx}" cy="${cy}" r="${isUp?6:4}" fill="${color}" stroke="#1a1a1a" stroke-width="1.5" style="cursor:pointer;">
+      <title>${escHtml(tip)}</title>
+    </circle>`;
+  }).join('');
+
+  // Interactive tooltip overlay (invisible rect per point)
+  const tooltipRects = hist.map((h,i)=>{
+    const prev = i>0 ? hist[i-1].cost : h.cost;
+    const isUp = h.cost > prev + 0.005;
+    const isDown = h.cost < prev - 0.005;
+    const dateStr = new Date(h.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const invLabel = h.invoiceNumber ? ` · Inv #${h.invoiceNumber}` : '';
+    const chgLabel = i===0 ? '' : isUp ? ` · <span style="color:#e74c3c">▲ +$${(h.cost-prev).toFixed(2)} PRICE INCREASE</span>` : isDown ? ` · <span style="color:#2ecc71">▼ -$${(prev-h.cost).toFixed(2)}</span>` : ' · no change';
+    const cx = xScale(i), cy = yScale(h.cost);
+    return `<rect x="${(cx-12).toFixed(1)}" y="${(cy-12).toFixed(1)}" width="24" height="24" fill="transparent" style="cursor:pointer;"
+      onmouseover="showPriceTip(event,'${escHtml(dateStr)}','${h.cost.toFixed(2)}','${h.invoiceNumber||''}',${isUp?1:isDown?-1:0},${i===0?1:0})"
+      onmouseout="hidePriceTip()"/>`;
+  }).join('');
+
+  document.getElementById('price-modal-content').innerHTML = `
+    <div style="margin-bottom:16px;">
+      <div style="font-family:var(--display);font-size:20px;letter-spacing:2px;margin-bottom:4px;">${escHtml(ph.item)}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--accent);">${ph.cat}</div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;">
+      ${[
+        ['CURRENT',`$${current.toFixed(2)}`,'var(--text)'],
+        ['AVG PRICE',`$${avg}`,'var(--muted)'],
+        ['ALL-TIME LOW',`$${Math.min(...prices).toFixed(2)}`,'var(--green)'],
+        ['ALL-TIME HIGH',`$${Math.max(...prices).toFixed(2)}`,'var(--accent2)'],
+        ['TOTAL CHANGE',`${totalChg>=0?'+':''}$${totalChg.toFixed(2)} (${totalChg>=0?'+':''}${totalPct}%)`,totalChg>0?'var(--accent2)':totalChg<0?'var(--green)':'var(--muted)']
+      ].map(([l,v,c])=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:10px 12px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">${l}</div>
+          <div style="font-family:var(--display);font-size:16px;color:${c};">${v}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Chart -->
+    <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:12px;">
+      <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible;">
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#d4a843" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#d4a843" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${yLabels}
+        ${xLabels}
+        ${areaPath ? `<path d="${areaPath}" fill="url(#areaGrad)"/>` : ''}
+        ${hist.length>1 ? `<polyline points="${linePts}" fill="none" stroke="#d4a843" stroke-width="2"/>` : ''}
+        ${dots}
+        ${tooltipRects}
+      </svg>
+      <!-- Tooltip -->
+      <div id="price-tip" style="display:none;position:absolute;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 12px;font-family:var(--mono);font-size:11px;pointer-events:none;z-index:10;white-space:nowrap;"></div>
+    </div>
+
+    <!-- Legend -->
+    <div style="display:flex;gap:16px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+      <span><span style="color:#e74c3c;">●</span> Price increase</span>
+      <span><span style="color:#2ecc71;">●</span> Price decrease</span>
+      <span><span style="color:#d4a843;">●</span> No change</span>
+      <span><span style="color:#888;">●</span> First entry</span>
+      <span style="margin-left:auto;color:var(--muted);">${hist.length} data point${hist.length!==1?'s':''} · hover dots for details</span>
+    </div>
+  `;
+
+  const modal = document.getElementById('price-history-modal');
+  modal.style.display='flex';
+}
+
+function closePriceModal() {
+  document.getElementById('price-history-modal').style.display='none';
+}
+
+function showPriceTip(event, date, price, invoiceNum, direction, isFirst) {
+  const tip = document.getElementById('price-tip');
+  if (!tip) return;
+  let html = `<strong>${date}</strong> · $${price}`;
+  if (invoiceNum) html += ` · Inv #${invoiceNum}`;
+  if (!isFirst) {
+    if (direction>0) html += ` · <span style="color:#e74c3c">▲ PRICE INCREASE</span>`;
+    else if (direction<0) html += ` · <span style="color:#2ecc71">▼ price decrease</span>`;
+  }
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+
+  // Position relative to chart container
+  const rect = tip.parentElement.getBoundingClientRect();
+  let x = event.clientX - rect.left + 10;
+  let y = event.clientY - rect.top - 40;
+  if (x + 300 > rect.width) x = event.clientX - rect.left - 310;
+  tip.style.left = Math.max(0,x) + 'px';
+  tip.style.top  = Math.max(0,y) + 'px';
+}
+
+function hidePriceTip() {
+  const tip = document.getElementById('price-tip');
+  if (tip) tip.style.display = 'none';
+}
+
 const price_up_style='color:var(--accent2);font-size:10px;';
 const price_down_style='color:var(--green);font-size:10px;';
 
@@ -2097,7 +2298,7 @@ function confirmInvoiceItems(){
       invoiceNumber:pendingInvoiceNumber||'',
       synced:false
     });
-    updatePriceHistory(i.item,i.category,i.unitCost||0,date);
+    updatePriceHistory(i.item,i.category,i.unitCost||0,date,pendingInvoiceNumber||'');
   });
   if (pendingInvoiceNumber) {
     if (!S().invoiceNumbers) S().invoiceNumbers=[];
