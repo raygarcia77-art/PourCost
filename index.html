@@ -934,6 +934,22 @@ input::placeholder{color:var(--muted);}
         <button class="btn btn-outline" onclick="pushAllToSheets()">↑ Push All Local Data to Sheets</button>
         <button class="btn btn-danger" onclick="clearLocalData()">⚠ Clear Local Cache</button>
       </div>
+      <hr class="divider">
+      <div class="section-header"><div class="section-title">DANGER ZONE</div></div>
+      <div style="background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.25);border-radius:6px;padding:16px 18px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.8;">
+          Use these options to reset data during testing. Both options below are <strong style="color:var(--accent2);">irreversible</strong> — there is no undo.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <button class="btn btn-danger" onclick="clearLocalData()">⚠ Clear Local Cache Only</button>
+          <button class="btn btn-danger" onclick="clearSheetsData('dh')" id="clear-sheets-dh">🗑 Clear Desert Hawk — Sheets + Local</button>
+          <button class="btn btn-danger" onclick="clearSheetsData('lh')" id="clear-sheets-lh">🗑 Clear Low Horse — Sheets + Local</button>
+          <button class="btn btn-danger" onclick="clearSheetsData('both')">🗑 Clear BOTH Bars — Full Reset</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">
+          "Clear Sheets + Local" wipes all data from both the Google Sheet tabs AND your browser — purchases, weeks, price history, invoices, everything. Use when starting fresh after testing.
+        </div>
+      </div>
       <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted);" id="last-sync-time">Last sync: never</div>
       <hr class="divider">
       <div class="section-header"><div class="section-title">SHEET STRUCTURE</div></div>
@@ -2698,6 +2714,64 @@ function renderSettings(){
   if(box) box.textContent=config.scriptUrl?'Connected via Apps Script: '+config.scriptUrl.slice(0,60)+'...':'Not configured — paste your Apps Script URL above.';
 }
 function clearLocalData(){if(!confirm('Clear local cache? Your Google Sheet data is safe.'))return;localStorage.removeItem('pourcost_states');states={dh:emptyBarState(),lh:emptyBarState()};saveLocal();renderAll();showToast('Local cache cleared');}
+
+async function clearSheetsData(which) {
+  const barNames = which==='both' ? 'BOTH BARS' : which==='dh' ? 'Desert Hawk' : 'Low Horse';
+  const confirmed = confirm(
+    `⚠️ CLEAR ALL DATA FOR ${barNames.toUpperCase()}?\n\n` +
+    `This will permanently delete:\n` +
+    `• All weekly entries\n` +
+    `• All purchases & invoices\n` +
+    `• Price history\n` +
+    `• Product mappings\n` +
+    `• Everything in Google Sheets\n\n` +
+    `This CANNOT be undone. Type OK to confirm.`
+  );
+  if (!confirmed) return;
+
+  // Second confirmation for safety
+  const typed = prompt(`Type DELETE to confirm clearing ${barNames}:`);
+  if ((typed||'').trim().toUpperCase() !== 'DELETE') {
+    showToast('Cancelled — nothing was cleared');
+    return;
+  }
+
+  const bars = which==='both' ? ['dh','lh'] : [which];
+  const scriptUrl = localStorage.getItem('pourcost_script_url');
+
+  showToast('⏳ Clearing data...');
+
+  for (const barId of bars) {
+    // Clear local state
+    states[barId] = emptyBarState();
+
+    // Clear each sheet by writing just the header row
+    if (scriptUrl) {
+      const p = barId==='dh' ? 'DH_' : 'LH_';
+      const sheets = [
+        { name: p+'Weeks',       header: ['id','week','start','purchases','end','sales','cogs','pct','notes'] },
+        { name: p+'Purchases',   header: ['id','date','item','cat','cost','qty','total','vendor'] },
+        { name: p+'PriceHistory',header: ['key','item','cat','history'] },
+        { name: p+'ProductMaps', header: ['id','name','cat','aliases'] },
+        { name: p+'PosItems',    header: ['items'] },
+        { name: p+'MenuItems',   header: ['id','name','cat','sellPrice','avgWeeklyUnits','ingredients'] },
+        { name: p+'WasteLogs',   header: ['id','date','type','item','qty','value','reason'] },
+        { name: p+'Depletions',  header: ['id','week','cat','product','sizeKey','startCount','endCount','costPerBottle'] },
+      ];
+      for (const sheet of sheets) {
+        try {
+          await gasWrite(sheet.name, [sheet.header]);
+        } catch(e) {
+          console.warn('Could not clear sheet', sheet.name, e);
+        }
+      }
+    }
+  }
+
+  saveLocal();
+  renderAll();
+  showToast(`✓ ${barNames} data cleared — fresh start!`);
+}
 function exportCSV(){
   let csv='DESERT HAWK — WEEKS\nWeek,Start,Purchases,End,COGS,Sales,COGS%,Notes\n';
   states.dh.weeks.forEach(w=>{csv+=`${getWeekLabel(w.week)},${w.start},${w.purchases},${w.end},${w.cogs},${w.sales},${w.pct.toFixed(1)}%,${w.notes||''}\n`;});
