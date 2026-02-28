@@ -1470,8 +1470,17 @@ function secToggle(titleEl, bodyId) {
   } catch(e){}
 }
 function initSections() {
+  // Valid section IDs in this version — anything else in storage gets cleared
+  const validIds = new Set(['sb-weekly-form','sb-pur-scan','sb-pur-inv','sb-pur-xfr','sb-pur-manual','sb-wc-add']);
   try {
-    const s = JSON.parse(localStorage.getItem('pourcost_sec')||'{}');
+    const raw = localStorage.getItem('pourcost_sec');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    // Strip out any stale IDs from previous versions
+    let dirty = false;
+    Object.keys(s).forEach(k => { if (!validIds.has(k)) { delete s[k]; dirty = true; } });
+    if (dirty) localStorage.setItem('pourcost_sec', JSON.stringify(s));
+    // Apply saved states
     Object.entries(s).forEach(([bodyId, state]) => {
       const body = document.getElementById(bodyId);
       const title = document.querySelector(`.section-title[onclick*="${bodyId}"]`);
@@ -1484,7 +1493,7 @@ function initSections() {
         title.dataset.collapsed = 'false';
       }
     });
-  } catch(e){}
+  } catch(e){ localStorage.removeItem('pourcost_sec'); }
 }
 
 function escHtml(s){
@@ -2605,7 +2614,6 @@ function parseToastSalesCSV(text) {
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
   if(lines.length < 2) return null;
 
-  // Parse a CSV row respecting quotes
   function parseRow(line){
     const cols=[]; let cur='',inQ=false;
     for(let i=0;i<line.length;i++){
@@ -2620,14 +2628,13 @@ function parseToastSalesCSV(text) {
   }
 
   const headers = parseRow(lines[0]).map(h=>h.replace(/"/g,'').toLowerCase().trim());
-  const catCol     = headers.findIndex(h=>h.includes('sales category')||h==='category'||h==='sales cat');
-  const itemCol    = headers.findIndex(h=>h.includes('item name')||h==='item'||h==='name');
-  const netSalesCol= headers.findIndex(h=>h.includes('net sales')||h==='net');
+  const catCol        = headers.findIndex(h=>h.includes('sales category')||h==='category'||h==='sales cat');
+  const diningCol     = headers.findIndex(h=>h.includes('dining option')||h.includes('dining'));
+  const itemCol       = headers.findIndex(h=>h.includes('item name')||h==='item'||h==='name');
+  const netSalesCol   = headers.findIndex(h=>h==='net sales'||h==='net');
 
-  // Need at least category and net sales columns
   if(catCol<0||netSalesCol<0) return null;
 
-  // Toast category → app category mapping
   const catMap = (toastCat) => {
     const c = (toastCat||'').toLowerCase();
     if(/liquor|spirit|cocktail|shot|whiskey|vodka|gin|rum|tequila/.test(c)) return 'spirits';
@@ -2635,37 +2642,42 @@ function parseToastSalesCSV(text) {
     if(/wine/.test(c)) return 'wine';
     if(/mixer|na |non.alc|juice|soda|water/.test(c)) return 'mixers';
     if(/food/.test(c)) return 'food';
-    return null; // unknown — will be added to mixers/other
+    return null;
   };
 
   const totals = {spirits:0, beer:0, wine:0, mixers:0, food:0};
-  let currentCat = null;
   let foundCategories = false;
+  const seen = new Set(); // prevent double-counting duplicate rows
 
   for(let i=1;i<lines.length;i++){
     const row = parseRow(lines[i]);
-    const cat = row[catCol]?.replace(/"/g,'').trim();
-    const itemName = itemCol>=0 ? row[itemCol]?.replace(/"/g,'').trim() : '';
-    const netVal = parseFloat(row[netSalesCol]?.replace(/[$,]/g,'')||'0');
+    const cat      = row[catCol]?.replace(/"/g,'').trim();
+    const dining   = diningCol>=0 ? row[diningCol]?.replace(/"/g,'').trim() : '';
+    const itemName = itemCol>=0   ? row[itemCol]?.replace(/"/g,'').trim()   : '';
+    const netVal   = parseFloat(row[netSalesCol]?.replace(/[$,]/g,'')||'0');
 
-    if(!cat||isNaN(netVal)) continue;
+    if(!cat||isNaN(netVal)||netVal===0) continue;
 
-    // Category subtotal row: has category name but no item name (or item name is empty/same as category)
-    const isSubtotal = !itemName || itemName==='' || itemName===cat;
+    // Subtotal row detection:
+    // Format A (with Dining Option col): empty dining option = category total row
+    // Format B (with Item Name col): empty item name = category total row
+    // We only want one row per category — skip if already seen
+    const hasDiningCol = diningCol >= 0;
+    const isSubtotal = hasDiningCol
+      ? dining === ''          // empty dining option = the summary row
+      : (!itemName || itemName === '' || itemName === cat);
 
-    if(isSubtotal && netVal!==0){
+    if(isSubtotal && !seen.has(cat)){
+      seen.add(cat);
       const mapped = catMap(cat);
-      if(mapped && mapped!=='food'){
-        totals[mapped] += netVal;
-        foundCategories = true;
-      } else if(mapped==='food'){
+      if(mapped==='food'){
         totals.food += netVal;
-        foundCategories = true;
+      } else if(mapped){
+        totals[mapped] += netVal;
       } else {
-        // Unknown category — add to mixers
         totals.mixers += netVal;
-        foundCategories = true;
       }
+      foundCategories = true;
     }
   }
 
@@ -4246,6 +4258,14 @@ function initApp(){
   if(lastSyncTime)document.getElementById('last-sync-time').textContent='Last sync: '+lastSyncTime.toLocaleString();
   switchBar('dh');
   renderAll();
+  // Clear any stale section collapse state from previous broken versions
+  try {
+    const s = JSON.parse(localStorage.getItem('pourcost_sec')||'{}');
+    const valid = ['sb-weekly-form','sb-pur-scan','sb-pur-inv','sb-pur-xfr','sb-pur-manual','sb-wc-add'];
+    const cleaned = {};
+    valid.forEach(k => { if (s[k]) cleaned[k] = s[k]; });
+    localStorage.setItem('pourcost_sec', JSON.stringify(cleaned));
+  } catch(e) { localStorage.removeItem('pourcost_sec'); }
   initSections();
 }
 
