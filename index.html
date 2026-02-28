@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PourCost — Multi-Bar COGS Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:#0e0e0e; --surface:#161616; --surface2:#1e1e1e; --border:#2a2a2a;
@@ -302,6 +303,23 @@ input::placeholder{color:var(--muted);}
 .pos-product-select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);margin-left:6px;}
 .pos-new-name-input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);width:200px;margin-left:6px;}
 .pos-new-name-input:focus,.pos-product-select:focus{outline:none;border-color:var(--accent);}
+/* ── PAR & ORDERING ── */
+.day-btn{padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);background:none;color:var(--muted);transition:all 0.15s;}
+.day-btn:hover{border-color:var(--text);color:var(--text);}
+.day-btn.active{background:rgba(212,168,67,0.15);border-color:var(--accent);color:var(--accent);}
+.par-below{color:var(--accent2);font-weight:600;}
+.par-ok{color:var(--green);}
+.par-warn{color:var(--accent);}
+.par-editable{cursor:pointer;border-bottom:1px dashed var(--muted);padding-bottom:1px;}
+.par-editable:hover{border-bottom-color:var(--accent);color:var(--accent);}
+.trend-sparkline{display:inline-flex;gap:2px;align-items:flex-end;height:16px;}
+.trend-bar{width:6px;border-radius:1px;background:var(--accent);opacity:0.7;}
+.order-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;}
+.order-item.urgent{border-color:rgba(192,57,43,0.4);background:rgba(192,57,43,0.04);}
+.order-item-name{font-family:var(--display);font-size:15px;letter-spacing:1px;}
+.order-item-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+.order-qty{font-family:var(--display);font-size:22px;color:var(--accent);}
+.order-cost{font-family:var(--mono);font-size:11px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -420,6 +438,7 @@ input::placeholder{color:var(--muted);}
     <div class="tab" onclick="switchTab('purchases')">Purchases</div>
     <div class="tab" onclick="switchTab('wastelog')">Waste &amp; Comps</div>
     <div class="tab" onclick="switchTab('depletion')">Bottle Depletion</div>
+    <div class="tab" onclick="switchTab('par')">PAR &amp; Ordering</div>
     <div class="tab" onclick="switchTab('prices')">Price Tracker</div>
     <div class="tab" onclick="switchTab('mapping')">Product Mapping</div>
     <div class="tab" onclick="switchTab('costing')">Menu Costing</div>
@@ -434,6 +453,9 @@ input::placeholder{color:var(--muted);}
       <div id="combined-banner" class="combined-banner" style="display:none;">
         ⊕ Combined View — showing totals across Desert Hawk + The Low Horse
       </div>
+
+      <!-- POS Date Reminder on Dashboard -->
+      <div id="dashboard-pos-reminder" style="display:none;margin-bottom:16px;"></div>
       <div class="stats-row" id="dash-stats-row">
         <div class="stat-card"><div class="stat-label">Weekly COGS %</div><div class="stat-value" id="dash-weekly-cogs">—</div><div class="stat-sub" id="dash-weekly-sub">No data yet</div></div>
         <div class="stat-card"><div class="stat-label">Monthly COGS %</div><div class="stat-value" id="dash-monthly-cogs">—</div><div class="stat-sub" id="dash-monthly-sub">No data yet</div></div>
@@ -481,7 +503,8 @@ input::placeholder{color:var(--muted);}
       </div>
 
       <!-- Category Breakdown -->
-      <div class="section-header" style="margin-top:8px;"><div class="section-title">COGS BY CATEGORY</div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Based on purchases this period</div></div>
+      <div class="section-header" style="margin-top:8px;"><div class="section-title">COGS BY CATEGORY</div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Based on purchases vs category sales</div></div>
+      <div id="cat-breakdown-note" style="display:none;font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:8px;">✓ Using actual category sales from POS upload — COGS % is per-category accurate</div>
       <div class="cat-grid" id="cat-breakdown-grid">
         <div class="cat-card spirits"><div class="cat-name">Spirits</div><div class="cat-pct" id="cat-spirits">—</div><div class="cat-detail" id="cat-spirits-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill spirits" id="cat-spirits-bar" style="width:0%"></div></div></div>
         <div class="cat-card beer"><div class="cat-name">Beer</div><div class="cat-pct" id="cat-beer">—</div><div class="cat-detail" id="cat-beer-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill beer" id="cat-beer-bar" style="width:0%"></div></div></div>
@@ -500,7 +523,7 @@ input::placeholder{color:var(--muted);}
     <div class="panel" id="panel-weekly">
       <div class="section-header">
         <div class="section-title">WEEKLY DATA ENTRY — <span id="weekly-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
-        <input type="week" id="week-picker" style="width:auto" onchange="updateWeekLabel()">
+        <input type="week" id="week-picker" style="width:auto" onchange="updateWeekLabel();autoFillPurchases()">
       </div>
       <div class="upload-grid">
         <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="start-status"></div></div>
@@ -509,17 +532,72 @@ input::placeholder{color:var(--muted);}
       </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title">MANUAL ENTRY</div></div>
+
+      <!-- POS Date Range Reminder Banner -->
+      <div id="pos-date-banner" style="display:none;margin-bottom:16px;padding:14px 18px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:6px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">📅 POS REPORT DATE RANGE</div>
+        <div style="font-family:var(--display);font-size:18px;letter-spacing:1px;" id="pos-date-range-text">—</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;" id="pos-date-range-sub">Run your POS report for this exact date range to match this inventory period</div>
+      </div>
+
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;">
         <div class="form-group"><label>Week</label><input type="week" id="entry-week"></div>
         <div class="form-group"><label>Start Inv $</label>
           <input type="number" id="entry-start" placeholder="0.00" step="0.01">
           <div id="carry-forward-hint" style="font-family:var(--mono);font-size:10px;color:var(--green);margin-top:3px;display:none;">↑ Auto-filled from last week's ending inventory</div>
         </div>
-        <div class="form-group"><label>Purchases $</label><input type="number" id="entry-purchases" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Purchases $
+          <button type="button" onclick="autoFillPurchases()" title="Sum purchases for the selected week"
+            style="margin-left:6px;font-size:9px;padding:2px 7px;background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.3);color:var(--accent);border-radius:3px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px;">↓ AUTO-FILL</button>
+          </label>
+          <input type="number" id="entry-purchases" placeholder="0.00" step="0.01" oninput="updatePreview()">
+          <div id="purchases-autofill-hint" style="font-family:var(--mono);font-size:10px;color:var(--green);margin-top:3px;display:none;"></div>
+        </div>
         <div class="form-group"><label>End Inv $</label><input type="number" id="entry-end" placeholder="0.00" step="0.01"></div>
-        <div class="form-group"><label>Gross Sales $</label><input type="number" id="entry-sales" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Total Bar Sales $</label><input type="number" id="entry-sales" placeholder="0.00" step="0.01" oninput="updatePreview()"></div>
         <div class="form-group"><label>Notes</label><input type="text" id="entry-notes" placeholder="Optional"></div>
         <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addWeekEntry()">+ ADD</button></div>
+      </div>
+
+      <!-- Category Sales Breakdown (auto-filled from POS upload) -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:16px;" id="cat-sales-box">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">🖥️ SALES BY CATEGORY <span style="color:var(--muted);font-size:9px;">— auto-filled from POS upload, or enter manually</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label>Spirits / Liquor $</label>
+            <input type="number" id="entry-sales-spirits" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Beer (Draft + Bottles) $</label>
+            <input type="number" id="entry-sales-beer" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Wine $</label>
+            <input type="number" id="entry-sales-wine" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Mixers / NA / Other $</label>
+            <input type="number" id="entry-sales-mixers" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;" id="cat-sales-hint">Upload your Toast Sales Category report to auto-fill these fields</div>
+      </div>
+
+      <!-- Inventory Date Tracker -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">📦 INVENTORY COUNT DATES <span style="color:var(--muted);font-size:9px;">— used to calculate exact POS report range</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="form-group" style="margin:0;">
+            <label>Start Count Date &amp; Time</label>
+            <input type="datetime-local" id="entry-start-date" onchange="updatePosDateBanner()">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="start-date-hint">When did you finish counting opening inventory?</div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>End Count Date &amp; Time</label>
+            <input type="datetime-local" id="entry-end-date" onchange="updatePosDateBanner()">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="end-date-hint">When did you finish counting closing inventory?</div>
+          </div>
+        </div>
       </div>
       <div id="weekly-calc-preview" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:18px;margin-bottom:20px;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">
@@ -543,11 +621,15 @@ input::placeholder{color:var(--muted);}
           <div style="font-family:var(--display);font-size:17px;letter-spacing:2px;">SCAN INVOICE</div>
           <div style="font-size:10px;background:rgba(212,168,67,0.15);color:var(--accent);padding:3px 8px;border-radius:3px;font-family:var(--mono);">AI-POWERED</div>
         </div>
-        <div class="scan-drop" onclick="document.getElementById('invoice-file').click()">
-          <input type="file" id="invoice-file" accept="image/*,.pdf" onchange="handleInvoiceScan(this)" style="display:none">
+        <div class="scan-drop" 
+          onclick="document.getElementById('invoice-file').click()"
+          ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='var(--accent)'"
+          ondragleave="this.style.borderColor=''"
+          ondrop="event.preventDefault();event.stopPropagation();this.style.borderColor='';handleInvoiceDrop(event)">
+          <input type="file" id="invoice-file" accept="image/*,.pdf,.csv,.xlsx,.xls" onchange="handleInvoiceScan(this)" style="display:none">
           <div style="font-size:28px;margin-bottom:8px;">📄</div>
-          <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Drop invoice image or PDF here</div>
-          <div style="font-size:12px;color:var(--muted);">AI will extract all line items automatically</div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Drop invoice here — PDF, image, or CSV</div>
+          <div style="font-size:12px;color:var(--muted);">AI reads PDFs and images · CSV/Excel parsed automatically</div>
         </div>
         <div id="scan-loading" style="display:none;text-align:center;padding:16px;font-family:var(--mono);font-size:12px;color:var(--muted);">⏳ Reading invoice...</div>
         <div class="ai-result" id="ai-result">
@@ -559,6 +641,24 @@ input::placeholder{color:var(--muted);}
           </div>
         </div>
       </div>
+      <hr class="divider">
+
+      <!-- Recent Invoices -->
+      <div class="section-header">
+        <div class="section-title">RECENT INVOICES</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="invoice-history-range" onchange="renderRecentInvoices()" style="font-family:var(--mono);font-size:11px;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;">
+            <option value="30">Last 30 days</option>
+            <option value="60">Last 60 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="9999">All time</option>
+          </select>
+        </div>
+      </div>
+      <div id="recent-invoices-list" style="margin-bottom:20px;">
+        <div class="empty-state">No invoices yet</div>
+      </div>
+
       <hr class="divider">
       <div class="section-header"><div class="section-title">MANUAL ENTRY</div></div>
       <div class="form-grid" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 1fr auto;">
@@ -664,6 +764,90 @@ input::placeholder{color:var(--muted);}
       </div>
 
       <div id="depletion-list"><div class="empty-state">No bottle counts entered yet. Click "+ Add Count" to start tracking.</div></div>
+    </div>
+
+    <!-- ── PAR & ORDERING ── -->
+    <div class="panel" id="panel-par">
+      <div class="section-header">
+        <div class="section-title">PAR &amp; ORDERING — <span id="par-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" onclick="exportOrderList()">↓ Export Order List</button>
+          <button class="btn btn-primary" onclick="renderPar()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="info-box" id="par-info-box">
+        PAR levels are calculated from your bottle depletion history. Add at least 2–3 weeks of depletion counts to get reliable suggestions. You can override any suggested PAR by clicking the value.
+      </div>
+
+      <!-- Summary alert row -->
+      <div id="par-alert-row" style="display:none;margin-bottom:16px;"></div>
+
+      <!-- Stats row -->
+      <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;" id="par-stats-row">
+        <div class="stat-card"><div class="stat-label">Products Tracked</div><div class="stat-value" id="par-stat-tracked">—</div><div class="stat-sub">With depletion data</div></div>
+        <div class="stat-card"><div class="stat-label">Below PAR</div><div class="stat-value bad" id="par-stat-below">—</div><div class="stat-sub">Need to order</div></div>
+        <div class="stat-card"><div class="stat-label">Est. Order Value</div><div class="stat-value" id="par-stat-value">—</div><div class="stat-sub">To bring back to PAR</div></div>
+        <div class="stat-card"><div class="stat-label">Weeks of Data</div><div class="stat-value" id="par-stat-weeks">—</div><div class="stat-sub">Used for averages</div></div>
+      </div>
+
+      <!-- Delivery schedule -->
+      <div class="section-header"><div class="section-title">DELIVERY SCHEDULE</div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Used to calculate buffer stock needed</div></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;min-width:160px;">
+          <label>Delivery Days</label>
+          <div style="display:flex;gap:6px;margin-top:4px;" id="delivery-days-picker">
+            <button class="day-btn" data-day="0" onclick="toggleDeliveryDay(0)">Sun</button>
+            <button class="day-btn" data-day="1" onclick="toggleDeliveryDay(1)">Mon</button>
+            <button class="day-btn" data-day="2" onclick="toggleDeliveryDay(2)">Tue</button>
+            <button class="day-btn" data-day="3" onclick="toggleDeliveryDay(3)">Wed</button>
+            <button class="day-btn" data-day="4" onclick="toggleDeliveryDay(4)">Thu</button>
+            <button class="day-btn" data-day="5" onclick="toggleDeliveryDay(5)">Fri</button>
+            <button class="day-btn" data-day="6" onclick="toggleDeliveryDay(6)">Sat</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Safety Buffer (days)</label>
+          <input type="number" id="par-buffer-days" value="1" min="0" max="7" style="width:80px;" onchange="saveParSettings();renderPar()">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Default Rounding</label>
+          <select id="par-rounding" onchange="saveParSettings();renderPar()" style="width:120px;">
+            <option value="up">Always round up</option>
+            <option value="nearest">Round to nearest</option>
+            <option value="none">No rounding</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- PAR table -->
+      <div class="section-header"><div class="section-title">PRODUCT PAR LEVELS</div></div>
+      <div class="table-wrap">
+        <table id="par-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Cat</th>
+              <th>Avg/Week</th>
+              <th>Suggested PAR</th>
+              <th>Your PAR</th>
+              <th>Est. On Hand</th>
+              <th>Need to Order</th>
+              <th>Order Value</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody id="par-table-body">
+            <tr><td colspan="9" class="empty-state">No depletion data yet — add bottle counts in the Bottle Depletion tab first</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Order list -->
+      <div id="par-order-section" style="display:none;margin-top:24px;">
+        <div class="section-header"><div class="section-title">ORDER LIST</div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Items currently below PAR</div></div>
+        <div id="par-order-list"></div>
+      </div>
     </div>
 
     <!-- ── PRODUCT MAPPING ── -->
@@ -859,7 +1043,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[] };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[] };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -1068,7 +1252,7 @@ function switchBar(barId) {
   else{badge.textContent='COMBINED';badge.className='active-bar-badge combined';}
   // Update per-tab bar name labels
   const name = barId==='combined'?'ALL BARS':barId==='dh'?'DESERT HAWK':'THE LOW HORSE';
-  ['weekly','purchases','prices','mapping','costing','wastelog','depletion','history'].forEach(tab=>{
+  ['weekly','purchases','prices','mapping','costing','wastelog','depletion','par','history'].forEach(tab=>{
     const el=document.getElementById(tab+'-bar-name'); if(el){el.textContent=name; el.style.color=barId==='combined'?'var(--green)':barId==='dh'?'#c0841a':'#9b6abf';}
   });
   // Hide entry tabs in combined mode (all except dashboard, history, settings)
@@ -1079,7 +1263,7 @@ function switchBar(barId) {
   const active = document.querySelector('.panel.active');
   if (active){
     const panelId = active.id.replace('panel-','');
-    if (isCombined && ['weekly','purchases','wastelog','depletion','prices','mapping','costing'].includes(panelId)) switchTab('dashboard');
+    if (isCombined && ['weekly','purchases','wastelog','depletion','par','prices','mapping','costing'].includes(panelId)) switchTab('dashboard');
     else renderCurrentPanel();
   }
 }
@@ -1093,6 +1277,7 @@ function renderCurrentPanel() {
   else if (panelId==='purchases') renderPurchasesTable();
   else if (panelId==='wastelog') renderWasteLog();
   else if (panelId==='depletion') renderDepletion();
+  else if (panelId==='par') renderPar();
   else if (panelId==='prices') renderPrices();
   else if (panelId==='mapping') renderMapping();
   else if (panelId==='costing') renderCosting();
@@ -1111,15 +1296,16 @@ function setSyncStatus(status, label) {
 // TABS
 // ══════════════════════════════════════════════
 function switchTab(name) {
-  const names=['dashboard','weekly','purchases','wastelog','depletion','prices','mapping','costing','history','settings'];
+  const names=['dashboard','weekly','purchases','wastelog','depletion','par','prices','mapping','costing','history','settings'];
   document.querySelectorAll('.tabs .tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='dashboard') renderDashboard();
-  else if (name==='weekly') { renderWeeklyTable(); tryCarryForward(); }
-  else if (name==='purchases') renderPurchasesTable();
+  else if (name==='weekly') { renderWeeklyTable(); tryCarryForward(); autoFillPurchases(); }
+  else if (name==='purchases') { renderPurchasesTable(); renderRecentInvoices(); }
   else if (name==='wastelog') renderWasteLog();
   else if (name==='depletion') renderDepletion();
+  else if (name==='par') renderPar();
   else if (name==='prices') renderPrices();
   else if (name==='mapping') renderMapping();
   else if (name==='costing') renderCosting();
@@ -1158,18 +1344,40 @@ function updatePreview(){
 
 function addWeekEntry(){
   if (activeBar==='combined'){showToast('Switch to a specific bar to add data',true);return;}
-  const week=document.getElementById('entry-week').value,start=parseFloat(document.getElementById('entry-start').value)||0,purchases=parseFloat(document.getElementById('entry-purchases').value)||0,end=parseFloat(document.getElementById('entry-end').value)||0,sales=parseFloat(document.getElementById('entry-sales').value)||0,notes=document.getElementById('entry-notes').value;
+  const week=document.getElementById('entry-week').value;
+  const start=parseFloat(document.getElementById('entry-start').value)||0;
+  const purchases=parseFloat(document.getElementById('entry-purchases').value)||0;
+  const end=parseFloat(document.getElementById('entry-end').value)||0;
+  const sales=parseFloat(document.getElementById('entry-sales').value)||0;
+  const notes=document.getElementById('entry-notes').value;
+  const startDate=document.getElementById('entry-start-date').value||'';
+  const endDate=document.getElementById('entry-end-date').value||'';
+  const salesSpirits=parseFloat(document.getElementById('entry-sales-spirits').value)||0;
+  const salesBeer=parseFloat(document.getElementById('entry-sales-beer').value)||0;
+  const salesWine=parseFloat(document.getElementById('entry-sales-wine').value)||0;
+  const salesMixers=parseFloat(document.getElementById('entry-sales-mixers').value)||0;
   if(!week){alert('Please select a week');return;}if(!sales){alert('Please enter sales');return;}
   const cogs=start+purchases-end,pct=sales>0?(cogs/sales)*100:0;
-  const entry={id:week,week,start,purchases,end,sales,cogs,pct,notes,synced:false};
+  const entry={id:week,week,start,purchases,end,sales,cogs,pct,notes,startDate,endDate,
+    salesSpirits,salesBeer,salesWine,salesMixers,synced:false};
   const idx=S().weeks.findIndex(w=>w.week===week);
   if(idx>=0){if(confirm('Overwrite this week?'))S().weeks[idx]=entry;else return;}
   else S().weeks.push(entry);
   S().weeks.sort((a,b)=>a.week.localeCompare(b.week));
   saveLocal();renderWeeklyTable();renderDashboard();
   showToast('✓ Week saved to '+BARS[activeBar].name);scheduleSync();
-  ['entry-start','entry-purchases','entry-end','entry-sales','entry-notes'].forEach(id=>document.getElementById(id).value='');
+  ['entry-start','entry-purchases','entry-end','entry-sales','entry-notes',
+   'entry-sales-spirits','entry-sales-beer','entry-sales-wine','entry-sales-mixers'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('weekly-calc-preview').style.display='none';
+  const hintEl=document.getElementById('cat-sales-hint');
+  if(hintEl) hintEl.textContent='Upload your Toast Sales Category report to auto-fill these fields';
+  const purHintEl=document.getElementById('purchases-autofill-hint');
+  if(purHintEl){ purHintEl.style.display='none'; purHintEl.textContent=''; }
+  if(endDate){
+    document.getElementById('entry-start-date').value=endDate;
+    document.getElementById('entry-end-date').value='';
+    updatePosDateBanner();
+  }
 }
 
 function deleteWeek(week){
@@ -1217,9 +1425,28 @@ function renderPurchasesTable(){
 function updatePriceHistory(item,cat,cost,date){
   const st = activeBar==='combined'?states.dh:S();
   const key=item.toLowerCase().trim();
-  if(!st.priceHistory[key])st.priceHistory[key]={item,cat,history:[]};
-  st.priceHistory[key].history.push({cost,date});
-  st.priceHistory[key].history.sort((a,b)=>a.date.localeCompare(b.date));
+  if(!st.priceHistory[key]){
+    st.priceHistory[key]={item,cat,history:[]};
+  } else {
+    // Always update category to the most recently confirmed value
+    st.priceHistory[key].cat = cat;
+  }
+  if(cost>0) {
+    st.priceHistory[key].history.push({cost,date});
+    st.priceHistory[key].history.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+}
+
+// Learn category without adding a price history entry (called when user changes category in review table)
+function learnCategory(itemName, cat) {
+  if(activeBar==='combined') return;
+  const key = itemName.toLowerCase().trim();
+  if(!S().priceHistory[key]) {
+    S().priceHistory[key] = {item:itemName, cat, history:[]};
+  } else {
+    S().priceHistory[key].cat = cat;
+  }
+  saveLocal();
 }
 
 function renderPrices(){
@@ -1292,6 +1519,7 @@ function renderDashboard(){
   renderCategoryBreakdown();
   renderShrinkageDashboard();
   renderVariance();
+  renderDashboardPosReminder();
 }
 
 function calcCogsStats(weeks){
@@ -1376,28 +1604,474 @@ function renderHistory(){
 // INVOICE SCAN
 // ══════════════════════════════════════════════
 let pendingInvoiceItems=[];
-async function handleInvoiceScan(input){
-  if(!input.files[0]||activeBar==='combined'){if(activeBar==='combined'){showToast('Switch to a specific bar first',true);return;}return;}
-  const file=input.files[0];
-  document.getElementById('scan-loading').style.display='block';document.getElementById('ai-result').classList.remove('show');
-  const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-  const mt=file.type||'image/jpeg';
-  try{
-    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:[{type:mt==='application/pdf'?'document':'image',source:{type:"base64",media_type:mt,data:base64}},{type:"text",text:`Bar inventory assistant. Extract line items from this invoice. Return ONLY JSON array:\n[{"item":"Tito's Vodka 1.75L","category":"Spirits","unitCost":29.99,"qty":3,"vendor":"Southern Glazer's"}]\nCategory: Spirits, Beer, Wine, Mixers, or Other. Return [] if unreadable.`}]}]})});
-    const data=await resp.json();const text=data.content?.map(c=>c.text||'').join('')||'[]';
-    let items=[];try{items=JSON.parse(text.replace(/```json|```/g,'').trim());}catch(e){}
+let pendingInvoiceNumber=null; // invoice # extracted from CSV, used for dupe detection
+let pendingInvoiceDate=null;   // invoice date extracted from CSV, used for purchase records
+function handleInvoiceDrop(event) {
+  const file = event.dataTransfer?.files?.[0];
+  if (!file) return;
+  // Feed into the same handler as file picker
+  handleInvoiceFile(file);
+}
+
+async function handleInvoiceScan(input) {
+  if (!input.files[0]) return;
+  if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
+  handleInvoiceFile(input.files[0]);
+}
+
+async function handleInvoiceFile(file) {
+  if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
+  document.getElementById('scan-loading').style.display='block';
+  document.getElementById('ai-result').classList.remove('show');
+
+  const name = file.name.toLowerCase();
+  const isCSV  = name.endsWith('.csv');
+  const isExcel= name.endsWith('.xlsx') || name.endsWith('.xls');
+
+  // ── CSV path — no AI needed ──
+  if (isCSV) {
+    const text = await file.text();
+    const { items, invoiceNumber, invoiceDate } = parseInvoiceCSV(text, file.name);
+    pendingInvoiceNumber = invoiceNumber || null;
+    pendingInvoiceDate   = invoiceDate   || null;
     document.getElementById('scan-loading').style.display='none';
-    if(!items.length){document.getElementById('ai-result-content').innerHTML='<span style="color:var(--accent2)">Could not extract items. Enter manually below.</span>';}
-    else{pendingInvoiceItems=items;document.getElementById('ai-result-content').innerHTML=`<table style="width:100%"><thead><tr><th style="text-align:left;padding:4px 8px;color:var(--muted)">ITEM</th><th style="padding:4px 8px;color:var(--muted)">CAT</th><th style="text-align:right;padding:4px 8px;color:var(--muted)">UNIT</th><th style="text-align:right;padding:4px 8px;color:var(--muted)">QTY</th><th style="text-align:right;padding:4px 8px;color:var(--muted)">TOTAL</th></tr></thead><tbody>${items.map(i=>`<tr><td style="padding:4px 8px">${escHtml(i.item)}</td><td style="padding:4px 8px;color:var(--accent)">${i.category}</td><td style="text-align:right;padding:4px 8px">${fmt$(i.unitCost)}</td><td style="text-align:right;padding:4px 8px">${i.qty||1}</td><td style="text-align:right;padding:4px 8px">${fmt$((i.unitCost||0)*(i.qty||1))}</td></tr>`).join('')}</tbody></table>`;}
+    if (invoiceNumber && checkDuplicateInvoice(invoiceNumber)) return;
+    showInvoiceResults(items, invoiceNumber ? `CSV parsed · Invoice #${invoiceNumber}` : 'CSV parsed');
+    return;
+  }
+
+  // ── Excel path ──
+  if (isExcel) {
+    const buffer = await file.arrayBuffer();
+    const items = parseInvoiceExcel(buffer, file.name);
+    document.getElementById('scan-loading').style.display='none';
+    showInvoiceResults(items, 'Excel parsed');
+    return;
+  }
+
+  // ── PDF / image — route through Apps Script AI ──
+  const base64 = await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+  const mt = file.type || 'image/jpeg';
+
+  try {
+    const result = await gasRequest({
+      action: 'scanInvoice',
+      mediaType: mt,
+      imageData: base64
+    });
+
+    document.getElementById('scan-loading').style.display='none';
+    let items = [];
+    try { items = JSON.parse((result.text||'[]').replace(/```json|```/g,'').trim()); } catch(e) {}
+    showInvoiceResults(items, 'AI scanned');
+  } catch(e) {
+    document.getElementById('scan-loading').style.display='none';
+    const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
+    document.getElementById('ai-result-content').innerHTML=`<span style="color:var(--accent2)">
+      ${isScriptError
+        ? 'Invoice scanning requires an updated Apps Script with the scanInvoice action, or enter items manually below.'
+        : 'Error: '+e.message}
+    </span>`;
     document.getElementById('ai-result').classList.add('show');
-  }catch(e){document.getElementById('scan-loading').style.display='none';document.getElementById('ai-result-content').innerHTML=`<span style="color:var(--accent2)">Error: ${e.message}</span>`;document.getElementById('ai-result').classList.add('show');}
+  }
 }
+
+// Show parsed invoice items in the result panel
+function showInvoiceResults(items, source) {
+  if (!items.length) {
+    document.getElementById('ai-result-content').innerHTML=`<span style="color:var(--accent2)">Could not extract items from this file. Check column headers or enter manually below.</span>`;
+    document.getElementById('ai-result').classList.add('show');
+    return;
+  }
+  pendingInvoiceItems = items;
+  const cats = ['Spirits','Beer','Wine','Mixers','Other'];
+
+  const buildRow = (i, idx) => {
+    const isCse = i.uom==='CSE' && i.unitsPerPack>1;
+    // trackAs: 'unit' = per bottle/can, 'case' = per case
+    const trackAs = i.trackAs || 'unit';
+    const displayCost = trackAs==='case' ? (i.unitCost * i.unitsPerPack) : i.unitCost;
+    const displayQty  = trackAs==='case' ? Math.round(i.qty / i.unitsPerPack) : i.qty;
+    const unitLabel   = trackAs==='case' ? 'case' : (i.uom==='CSE' ? 'btl' : 'ea');
+
+    return `<tr id="inv-row-${idx}" style="border-top:1px solid var(--border)">
+      <td style="padding:4px 4px;">
+        <input type="text" value="${escHtml(i.item)}"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:3px;font-size:12px;width:100%;min-width:180px;"
+          onchange="updatePendingItem(${idx},'item',this.value)">
+      </td>
+      <td style="padding:4px 4px;">
+        <select onchange="updatePendingItem(${idx},'category',this.value)"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:4px 6px;border-radius:3px;font-size:12px;font-family:var(--mono);">
+          ${cats.map(c=>`<option value="${c}"${c===i.category?' selected':''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td style="padding:4px 4px;text-align:right;">
+        <input type="number" id="inv-cost-${idx}" value="${displayCost.toFixed(2)}" step="0.01" min="0"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:3px;font-size:12px;width:80px;text-align:right;"
+          onchange="updateInvCost(${idx},parseFloat(this.value)||0)">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:1px;text-align:right;">per ${unitLabel}</div>
+      </td>
+      <td style="padding:4px 4px;text-align:right;">
+        <input type="number" id="inv-qty-${idx}" value="${displayQty}" step="1" min="1"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:3px;font-size:12px;width:55px;text-align:right;"
+          onchange="updateInvQty(${idx},parseInt(this.value)||1)">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:1px;text-align:right;">${unitLabel}s</div>
+      </td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);font-size:12px;" id="inv-total-${idx}">
+        ${fmt$(i.unitCost * i.qty)}
+      </td>
+      <td style="padding:4px 6px;text-align:center;">
+        ${isCse ? `
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;">${i.unitsPerPack}/case</div>
+        <div style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;width:fit-content;margin:0 auto;">
+          <button onclick="setInvTrackAs(${idx},'unit')" id="inv-track-unit-${idx}"
+            style="padding:2px 7px;font-size:10px;font-family:var(--mono);cursor:pointer;border:none;background:${trackAs==='unit'?'rgba(212,168,67,0.2)':'none'};color:${trackAs==='unit'?'var(--accent)':'var(--muted)'};">btl</button>
+          <button onclick="setInvTrackAs(${idx},'case')" id="inv-track-case-${idx}"
+            style="padding:2px 7px;font-size:10px;font-family:var(--mono);cursor:pointer;border:none;border-left:1px solid var(--border);background:${trackAs==='case'?'rgba(212,168,67,0.2)':'none'};color:${trackAs==='case'?'var(--accent)':'var(--muted)'};">case</button>
+        </div>` : `<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">${i.uom||'EA'}</span>`}
+      </td>
+      <td style="padding:4px 4px;">
+        <button onclick="removeInvoiceRow(${idx})"
+          style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 7px;border-radius:3px;cursor:pointer;font-size:11px;">✕</button>
+      </td>
+    </tr>`;
+  };
+
+  document.getElementById('ai-result-content').innerHTML=`
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;">
+      ✓ ${source} — ${items.length} items found · <span style="color:var(--accent)">Edit any field · toggle btl/case for cases</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;" id="invoice-edit-table">
+      <thead><tr>
+        <th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">ITEM NAME</th>
+        <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">CATEGORY</th>
+        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">UNIT COST</th>
+        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">QTY</th>
+        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">TOTAL</th>
+        <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);text-align:center;">TRACK AS</th>
+        <th style="padding:5px;"></th>
+      </tr></thead>
+      <tbody id="invoice-edit-tbody">
+      ${items.map((i,idx)=>buildRow(i,idx)).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  document.getElementById('ai-result').classList.add('show');
+}
+
+// Toggle between per-bottle and per-case tracking for a CSE line item
+function setInvTrackAs(idx, trackAs) {
+  const item = pendingInvoiceItems[idx];
+  if (!item) return;
+  item.trackAs = trackAs;
+
+  const isCse = item.uom==='CSE' && item.unitsPerPack>1;
+  if (!isCse) return;
+
+  const displayCost = trackAs==='case' ? (item.unitCost * item.unitsPerPack) : item.unitCost;
+  const displayQty  = trackAs==='case' ? Math.round(item.qty / item.unitsPerPack) : item.qty;
+  const unitLabel   = trackAs==='case' ? 'case' : 'btl';
+
+  // Update input fields
+  const costEl = document.getElementById(`inv-cost-${idx}`);
+  const qtyEl  = document.getElementById(`inv-qty-${idx}`);
+  if (costEl) { costEl.value = displayCost.toFixed(2); costEl.nextElementSibling.textContent = `per ${unitLabel}`; }
+  if (qtyEl)  { qtyEl.value  = displayQty;             qtyEl.nextElementSibling.textContent  = `${unitLabel}s`; }
+
+  // Update toggle button styles
+  const unitBtn = document.getElementById(`inv-track-unit-${idx}`);
+  const caseBtn = document.getElementById(`inv-track-case-${idx}`);
+  if (unitBtn) { unitBtn.style.background = trackAs==='unit' ? 'rgba(212,168,67,0.2)' : 'none'; unitBtn.style.color = trackAs==='unit' ? 'var(--accent)' : 'var(--muted)'; }
+  if (caseBtn) { caseBtn.style.background = trackAs==='case' ? 'rgba(212,168,67,0.2)' : 'none'; caseBtn.style.color = trackAs==='case' ? 'var(--accent)' : 'var(--muted)'; }
+
+  updateInvRowTotal(idx);
+}
+
+// Update cost field — always store as per-unit internally
+function updateInvCost(idx, displayCost) {
+  const item = pendingInvoiceItems[idx];
+  if (!item) return;
+  const trackAs = item.trackAs || 'unit';
+  // Convert display value back to per-unit for storage
+  item.unitCost = trackAs==='case' ? displayCost / item.unitsPerPack : displayCost;
+  updateInvRowTotal(idx);
+}
+
+// Update qty field — always store as per-unit internally
+function updateInvQty(idx, displayQty) {
+  const item = pendingInvoiceItems[idx];
+  if (!item) return;
+  const trackAs = item.trackAs || 'unit';
+  item.qty = trackAs==='case' ? displayQty * item.unitsPerPack : displayQty;
+  updateInvRowTotal(idx);
+}
+
+function updatePendingItem(idx, field, value) {
+  if (!pendingInvoiceItems[idx]) return;
+  pendingInvoiceItems[idx][field] = value;
+  // Immediately learn category changes so they persist even if user doesn't confirm
+  if (field === 'category') {
+    learnCategory(pendingInvoiceItems[idx].item, value);
+    showToast(`✓ "${pendingInvoiceItems[idx].item.split(' ').slice(0,3).join(' ')}" → ${value} remembered`);
+  }
+}
+
+function updateInvRowTotal(idx) {
+  const item = pendingInvoiceItems[idx];
+  if (!item) return;
+  const el = document.getElementById('inv-total-'+idx);
+  // Total is always unitCost (per bottle) × qty (bottles) regardless of display mode
+  if (el) el.textContent = fmt$((item.unitCost||0)*(item.qty||1));
+}
+
+function removeInvoiceRow(idx) {
+  pendingInvoiceItems[idx] = null; // mark as removed
+  const row = document.getElementById('inv-row-'+idx);
+  if (row) row.style.display = 'none';
+}
+
+// Guess category from product name
+function guessCategory(name) {
+  // Check learned category from price history first (most accurate)
+  const key = (name||'').toLowerCase().trim();
+  const bar = activeBar==='combined' ? 'dh' : activeBar;
+  const learned = states[bar]?.priceHistory?.[key]?.cat;
+  if (learned) return learned;
+  // Also check the other bar's history
+  const otherBar = bar==='dh' ? 'lh' : 'dh';
+  const learnedOther = states[otherBar]?.priceHistory?.[key]?.cat;
+  if (learnedOther) return learnedOther;
+  // Fall back to keyword matching
+  const n = key;
+  if (/vodka|whiskey|whisky|bourbon|scotch|gin|rum|tequila|mezcal|brandy|cognac|liqueur|schnapps|triple sec|amaretto|kahlua|baileys|fireball|jack|jim beam|maker|patron|grey goose|titos|hennessy|brbn|vdk|teq/.test(n)) return 'Spirits';
+  if (/beer|lager|ale|ipa|stout|porter|seltzer|cider|corona|modelo|bud|miller|coors|heineken|stella|dos equis|white claw|truly|keg|high noon|pils|hefe/.test(n)) return 'Beer';
+  if (/wine|chardonnay|cabernet|merlot|pinot|sauvignon|riesling|prosecco|champagne|rose|ros|malbec|shiraz|syrah|cab sauv/.test(n)) return 'Wine';
+  if (/juice|syrup|soda|water|tonic|ginger|mix|grenadine|lime|lemon|agave|simple|bitters|vermouth|sour|cream|milk|sugar|salt|red bull|energy/.test(n)) return 'Mixers';
+  return 'Other';
+}
+
+// Parse distributor CSV — handles many common column name formats
+function parseInvoiceCSV(text, filename) {
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  if (lines.length < 2) return { items:[], invoiceNumber:null };
+
+  // Parse CSV respecting quoted fields
+  function parseRow(line) {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i=0; i<line.length; i++) {
+      const c = line[i];
+      if (c==='"' && !inQ) { inQ=true; }
+      else if (c==='"' && inQ) { inQ=false; }
+      else if ((c===',' || c==='\t') && !inQ) { cols.push(cur.trim()); cur=''; }
+      else cur+=c;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }
+
+  const headers = parseRow(lines[0]).map(h=>h.replace(/"/g,'').toLowerCase().trim());
+
+  // Flexible column finder
+  const findCol = (...terms) => {
+    for (const t of terms) {
+      const idx = headers.findIndex(h=>h.includes(t));
+      if (idx>=0) return idx;
+    }
+    return -1;
+  };
+
+  // Extract invoice number from first data row
+  const invoiceNumCol = findCol('invoice number','invoice #','invoice no','inv number','inv#','inv no');
+  let invoiceNumber = null;
+  if (invoiceNumCol>=0 && lines.length>1) {
+    const firstRow = parseRow(lines[1]);
+    const raw = firstRow[invoiceNumCol]?.replace(/"/g,'').trim();
+    if (raw && raw.length > 0) invoiceNumber = raw;
+  }
+  // Also try extracting from filename e.g. Invoice-0125803552.csv
+  if (!invoiceNumber) {
+    const m = filename.match(/[Ii]nvoice[-_]?(\d{6,})/);
+    if (m) invoiceNumber = m[1];
+  }
+
+  const itemCol       = findCol('item description','description','product','item name','brand','name');
+  const qtyCol        = findCol('quantity','qty','ordered','units','count','bottles','cases');
+  const unitCostCol   = findCol('unit cost','unit price','price per','bottle cost','btl price','each price');
+  const netValCol     = findCol('net value','net amount','extended','line total','amount','total','ext price','line price');
+  const uomCol        = findCol('unit of measure','uom','unit');
+  const unitsPerPackCol = findCol('units per pack','units/pack','pack size','bottles per case','btls per case');
+  const vendorCol     = findCol('vendor','supplier','distributor');
+  const dateCol       = findCol('invoice date','date','order date','delivery date');
+
+  if (itemCol < 0) return { items:[], invoiceNumber, invoiceDate:null };
+
+  // Auto-set week from invoice date AND capture it for purchase records
+  let invoiceDate = null;
+  if (dateCol >= 0 && lines.length > 1) {
+    const firstRow = parseRow(lines[1]);
+    const raw = firstRow[dateCol]?.replace(/"/g,'').trim();
+    if (raw) {
+      const m = raw.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+      if (m) {
+        let y = parseInt(m[3]); if (y < 100) y += 2000;
+        const d = new Date(y, parseInt(m[1])-1, parseInt(m[2]));
+        if (!isNaN(d)) {
+          invoiceDate = d.toISOString().slice(0,10); // store as YYYY-MM-DD
+          const jan1 = new Date(d.getFullYear(),0,1);
+          const wk = Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+          const wkStr = `${d.getFullYear()}-W${String(wk).padStart(2,'0')}`;
+          const wp = document.getElementById('week-picker');
+          const ew = document.getElementById('entry-week');
+          if (wp && (!wp.value || wp.value !== wkStr)) { wp.value = wkStr; updateWeekLabel && updateWeekLabel(); }
+          if (ew) ew.value = wkStr;
+          showToast(`📅 Week auto-set from invoice date: ${d.toLocaleDateString()}`);
+        }
+      }
+    }
+  }
+
+  const items = [];
+  for (let i=1; i<lines.length; i++) {
+    const row = parseRow(lines[i]);
+    const item = row[itemCol]?.replace(/"/g,'').trim();
+    if (!item) continue;
+
+    const itemLower = item.toLowerCase();
+    if (['service fee','delivery fee','fuel surcharge','minimum','tax','subtotal','total','freight','handling','credit'].some(s=>itemLower.includes(s))) continue;
+
+    let qty      = qtyCol>=0 ? parseFloat(row[qtyCol]?.replace(/[$,"]/g,''))||1 : 1;
+    let unitCost = 0;
+    const uom    = uomCol>=0 ? row[uomCol]?.replace(/"/g,'').trim().toUpperCase() : 'EA';
+
+    let unitsPerPack = 1;
+    if (unitsPerPackCol>=0) {
+      const upp = parseInt(row[unitsPerPackCol]?.replace(/[$,"]/g,'').trim());
+      if (!isNaN(upp) && upp > 0 && upp < 500) unitsPerPack = upp;
+    }
+
+    if (unitCostCol>=0) {
+      unitCost = parseFloat(row[unitCostCol]?.replace(/[$,"]/g,''))||0;
+    }
+    if (!unitCost && netValCol>=0) {
+      const netVal = parseFloat(row[netValCol]?.replace(/[$,"]/g,''))||0;
+      if (qty > 0) unitCost = netVal / qty;
+    }
+
+    let perBottleCost = unitCost;
+    let bottleQty = qty;
+    if (uom === 'CSE' && unitsPerPack > 1) {
+      perBottleCost = unitCost / unitsPerPack;
+      bottleQty = qty * unitsPerPack;
+    }
+
+    if (!perBottleCost || perBottleCost <= 0) continue;
+
+    const vendor = vendorCol>=0 ? row[vendorCol]?.replace(/"/g,'').trim() : '';
+
+    items.push({
+      item,
+      category: guessCategory(item),
+      unitCost: Math.round(perBottleCost*100)/100,
+      qty: bottleQty,
+      vendor: vendor || guessVendorFromFilename(filename),
+      uom,
+      unitsPerPack
+    });
+  }
+  return { items, invoiceNumber, invoiceDate };
+}
+
+// Excel parsing using SheetJS if available, otherwise fallback message
+function parseInvoiceExcel(buffer) {
+  try {
+    // SheetJS is loaded via CDN in the head — if available use it
+    if (typeof XLSX === 'undefined') {
+      showToast('Excel parsing requires the page to fully load — try again or use CSV export from Excel', true);
+      return [];
+    }
+    const wb = XLSX.read(buffer, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const csvText = XLSX.utils.sheet_to_csv(ws);
+    return parseInvoiceCSV(csvText, '');
+  } catch(e) {
+    showToast('Could not parse Excel file: '+e.message, true);
+    return [];
+  }
+}
+
+function guessVendorFromFilename(filename) {
+  const known = ['southern','glazer','republic','breakthru','rndc','johnson brothers','charmer','Total Wine','fintech'];
+  const n = filename.toLowerCase();
+  for (const v of known) { if (n.includes(v.toLowerCase())) return v; }
+  return '';
+}
+// Check if invoice number was already imported — returns true if duplicate (and shows warning)
+function checkDuplicateInvoice(invoiceNumber) {
+  if (!invoiceNumber || activeBar==='combined') return false;
+  const known = S().invoiceNumbers || [];
+  if (known.includes(invoiceNumber)) {
+    document.getElementById('scan-loading').style.display='none';
+    document.getElementById('ai-result-content').innerHTML=`
+      <div style="padding:14px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.3);border-radius:6px;">
+        <div style="font-family:var(--display);font-size:16px;letter-spacing:1px;color:var(--accent2);margin-bottom:6px;">⚠ DUPLICATE INVOICE DETECTED</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text);">Invoice #<strong>${invoiceNumber}</strong> has already been imported into ${BARS[activeBar].name}.</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;">If you need to re-import it, delete the original entries from the Purchases tab first.</div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-outline" onclick="forceImportAnyway()" style="font-size:11px;margin-right:8px;">Import Anyway</button>
+          <button class="btn btn-outline" onclick="clearScan()" style="font-size:11px;">Cancel</button>
+        </div>
+      </div>`;
+    document.getElementById('ai-result').classList.add('show');
+    return true;
+  }
+  return false;
+}
+
+function forceImportAnyway() {
+  // User confirmed they want to import despite duplicate warning
+  const active = pendingInvoiceItems.filter(i=>i!==null);
+  if (!active.length) { clearScan(); return; }
+  showInvoiceResults(active, pendingInvoiceNumber ? `Invoice #${pendingInvoiceNumber} (forced re-import)` : 'Re-import');
+}
+
 function confirmInvoiceItems(){
-  const date=new Date().toISOString().slice(0,10);
-  pendingInvoiceItems.forEach(i=>{S().purchases.push({id:Date.now()+Math.random()+'',date,item:i.item,cat:i.category,cost:i.unitCost||0,qty:i.qty||1,total:(i.unitCost||0)*(i.qty||1),vendor:i.vendor||'',synced:false});updatePriceHistory(i.item,i.category,i.unitCost||0,date);});
-  saveLocal();renderPurchasesTable();renderPrices();clearScan();showToast(`✓ ${pendingInvoiceItems.length} items added to ${BARS[activeBar].name}`);scheduleSync();pendingInvoiceItems=[];
+  // Use invoice date if available, otherwise today
+  const date = pendingInvoiceDate || new Date().toISOString().slice(0,10);
+  const active = pendingInvoiceItems.filter(i=>i!==null);
+  active.forEach(i=>{
+    S().purchases.push({
+      id:Date.now()+Math.random()+'',
+      date,
+      item:i.item,
+      cat:i.category,
+      cost:i.unitCost||0,
+      qty:i.qty||1,
+      total:(i.unitCost||0)*(i.qty||1),
+      vendor:i.vendor||'',
+      invoiceNumber:pendingInvoiceNumber||'',
+      synced:false
+    });
+    updatePriceHistory(i.item,i.category,i.unitCost||0,date);
+  });
+  if (pendingInvoiceNumber) {
+    if (!S().invoiceNumbers) S().invoiceNumbers=[];
+    if (!S().invoiceNumbers.includes(pendingInvoiceNumber)) {
+      S().invoiceNumbers.push(pendingInvoiceNumber);
+    }
+  }
+  saveLocal();renderPurchasesTable();renderPrices();renderRecentInvoices();clearScan();
+  showToast(`✓ ${active.length} items added to ${BARS[activeBar].name} · dated ${date}`);
+  scheduleSync();pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;
 }
-function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];}
+function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;}
 
 // ══════════════════════════════════════════════
 // CSV UPLOAD
@@ -1479,13 +2153,35 @@ function handlePOSUpload(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=(e)=>{
-    const text=e.target.result,lines=text.split('\n').filter(l=>l.trim());
-    // Sum largest numeric column for sales total
-    let colSums={};
-    lines.slice(1).forEach(line=>{line.split(',').forEach((v,i)=>{const n=parseFloat(v.replace(/[$,]/g,''));if(!isNaN(n)&&n>0)colSums[i]=(colSums[i]||0)+n;});});
-    const maxCol=Object.values(colSums).length?Math.max(...Object.values(colSums)):0;
-    document.getElementById('entry-sales').value=maxCol.toFixed(2);
-    document.getElementById('pos-status').textContent=`✓ ${fmt$(maxCol)} total sales`;
+    const text=e.target.result;
+    const result = parseToastSalesCSV(text);
+    if(result){
+      // Category-aware parse succeeded
+      document.getElementById('entry-sales').value=result.total.toFixed(2);
+      document.getElementById('entry-sales-spirits').value=result.spirits>0?result.spirits.toFixed(2):'';
+      document.getElementById('entry-sales-beer').value=result.beer>0?result.beer.toFixed(2):'';
+      document.getElementById('entry-sales-wine').value=result.wine>0?result.wine.toFixed(2):'';
+      document.getElementById('entry-sales-mixers').value=result.mixers>0?result.mixers.toFixed(2):'';
+      document.getElementById('pos-status').textContent=`✓ ${fmt$(result.total)} bar sales`;
+      const hintEl=document.getElementById('cat-sales-hint');
+      if(hintEl){
+        const parts=[];
+        if(result.spirits) parts.push(`Spirits ${fmt$(result.spirits)}`);
+        if(result.beer) parts.push(`Beer ${fmt$(result.beer)}`);
+        if(result.wine) parts.push(`Wine ${fmt$(result.wine)}`);
+        if(result.mixers) parts.push(`Mixers ${fmt$(result.mixers)}`);
+        if(result.food) parts.push(`Food ${fmt$(result.food)} (excluded)`);
+        hintEl.textContent='✓ Parsed: '+parts.join(' · ');
+      }
+    } else {
+      // Fallback: sum largest numeric column
+      const lines=text.split('\n').filter(l=>l.trim());
+      let colSums={};
+      lines.slice(1).forEach(line=>{line.split(',').forEach((v,i)=>{const n=parseFloat(v.replace(/[$,]/g,''));if(!isNaN(n)&&n>0)colSums[i]=(colSums[i]||0)+n;});});
+      const maxCol=Object.values(colSums).length?Math.max(...Object.values(colSums)):0;
+      document.getElementById('entry-sales').value=maxCol.toFixed(2);
+      document.getElementById('pos-status').textContent=`✓ ${fmt$(maxCol)} total sales`;
+    }
     document.getElementById('upload-pos').classList.add('loaded');
     updatePreview();
     // Extract items and check for unmatched
@@ -1495,19 +2191,102 @@ function handlePOSUpload(input){
   reader.readAsText(file);
 }
 
-function extractPosItems(csvText){
-  // Returns array of NEW item names not yet in posItems
-  const lines=csvText.split('\n').filter(l=>l.trim());if(!lines.length)return[];
-  const headers=lines[0].split(',').map(h=>h.toLowerCase().replace(/"/g,'').trim());
-  const idx=headers.findIndex(h=>/item|product|name|description|menu/i.test(h));if(idx<0)return[];
-  const items=[...new Set(lines.slice(1).map(l=>(l.split(',')[idx]||'').replace(/"/g,'').trim()).filter(Boolean))];
-  const existing=new Set((S().posItems||[]).map(s=>s.toLowerCase()));
-  const brandNew=items.filter(n=>!existing.has(n.toLowerCase()));
-  // Merge all items into posItems regardless
-  S().posItems=[...new Set([...(S().posItems||[]),...items])];
-  saveLocal();scheduleSync();
-  return brandNew;
+// Parse Toast Sales Category CSV — handles category subtotal rows
+function parseToastSalesCSV(text) {
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length < 2) return null;
+
+  // Parse a CSV row respecting quotes
+  function parseRow(line){
+    const cols=[]; let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'&&!inQ){inQ=true;}
+      else if(c==='"'&&inQ){inQ=false;}
+      else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }
+
+  const headers = parseRow(lines[0]).map(h=>h.replace(/"/g,'').toLowerCase().trim());
+  const catCol     = headers.findIndex(h=>h.includes('sales category')||h==='category'||h==='sales cat');
+  const itemCol    = headers.findIndex(h=>h.includes('item name')||h==='item'||h==='name');
+  const netSalesCol= headers.findIndex(h=>h.includes('net sales')||h==='net');
+
+  // Need at least category and net sales columns
+  if(catCol<0||netSalesCol<0) return null;
+
+  // Toast category → app category mapping
+  const catMap = (toastCat) => {
+    const c = (toastCat||'').toLowerCase();
+    if(/liquor|spirit|cocktail|shot|whiskey|vodka|gin|rum|tequila/.test(c)) return 'spirits';
+    if(/draft beer|bottled beer|beer|cider|seltzer/.test(c)) return 'beer';
+    if(/wine/.test(c)) return 'wine';
+    if(/mixer|na |non.alc|juice|soda|water/.test(c)) return 'mixers';
+    if(/food/.test(c)) return 'food';
+    return null; // unknown — will be added to mixers/other
+  };
+
+  const totals = {spirits:0, beer:0, wine:0, mixers:0, food:0};
+  let currentCat = null;
+  let foundCategories = false;
+
+  for(let i=1;i<lines.length;i++){
+    const row = parseRow(lines[i]);
+    const cat = row[catCol]?.replace(/"/g,'').trim();
+    const itemName = itemCol>=0 ? row[itemCol]?.replace(/"/g,'').trim() : '';
+    const netVal = parseFloat(row[netSalesCol]?.replace(/[$,]/g,'')||'0');
+
+    if(!cat||isNaN(netVal)) continue;
+
+    // Category subtotal row: has category name but no item name (or item name is empty/same as category)
+    const isSubtotal = !itemName || itemName==='' || itemName===cat;
+
+    if(isSubtotal && netVal!==0){
+      const mapped = catMap(cat);
+      if(mapped && mapped!=='food'){
+        totals[mapped] += netVal;
+        foundCategories = true;
+      } else if(mapped==='food'){
+        totals.food += netVal;
+        foundCategories = true;
+      } else {
+        // Unknown category — add to mixers
+        totals.mixers += netVal;
+        foundCategories = true;
+      }
+    }
+  }
+
+  if(!foundCategories) return null;
+
+  const total = totals.spirits + totals.beer + totals.wine + totals.mixers;
+  if(total<=0) return null;
+
+  return {
+    total: Math.round(total*100)/100,
+    spirits: Math.round(totals.spirits*100)/100,
+    beer: Math.round(totals.beer*100)/100,
+    wine: Math.round(totals.wine*100)/100,
+    mixers: Math.round(totals.mixers*100)/100,
+    food: Math.round(totals.food*100)/100
+  };
 }
+
+function recalcTotalSales(){
+  const s=parseFloat(document.getElementById('entry-sales-spirits').value)||0;
+  const b=parseFloat(document.getElementById('entry-sales-beer').value)||0;
+  const w=parseFloat(document.getElementById('entry-sales-wine').value)||0;
+  const m=parseFloat(document.getElementById('entry-sales-mixers').value)||0;
+  const total=s+b+w+m;
+  if(total>0){
+    document.getElementById('entry-sales').value=total.toFixed(2);
+    updatePreview();
+  }
+}
+
 
 // ══════════════════════════════════════════════
 // POS REVIEW MODAL
@@ -1736,12 +2515,20 @@ function weekToDate(weekStr) {
 }
 
 function renderCategoryBreakdown() {
-  // Determine which bar(s) to use
   const barIds = activeBar === 'combined' ? ['dh','lh'] : [activeBar];
   const latestWeek = barIds.map(b => states[b].weeks).flat().sort((a,b)=>b.week.localeCompare(a.week))[0];
   const totalSales = latestWeek ? latestWeek.sales : 0;
 
-  // Aggregate category spend
+  // Check if we have category-level sales data
+  const hasCatSales = latestWeek && (latestWeek.salesSpirits||latestWeek.salesBeer||latestWeek.salesWine||latestWeek.salesMixers);
+  const catSales = {
+    spirits: barIds.reduce((s,b)=>s+(states[b].weeks.slice(-1)[0]?.salesSpirits||0),0),
+    beer:    barIds.reduce((s,b)=>s+(states[b].weeks.slice(-1)[0]?.salesBeer||0),0),
+    wine:    barIds.reduce((s,b)=>s+(states[b].weeks.slice(-1)[0]?.salesWine||0),0),
+    mixers:  barIds.reduce((s,b)=>s+(states[b].weeks.slice(-1)[0]?.salesMixers||0),0),
+  };
+
+  // Aggregate category purchases
   const combined = {};
   CAT_DEFS.forEach(c => { combined[c.key] = { spend:0, count:0 }; });
   barIds.forEach(b => {
@@ -1756,10 +2543,12 @@ function renderCategoryBreakdown() {
 
   CAT_DEFS.forEach(c => {
     const spend = combined[c.key].spend;
-    const pct = totalSales > 0 ? (spend / totalSales) * 100 : 0;
-    const pctEl = document.getElementById('cat-'+c.key);
-    const detailEl = document.getElementById('cat-'+c.key+'-detail');
-    const barEl = document.getElementById('cat-'+c.key+'-bar');
+    // Use category-specific sales if available, otherwise fall back to total sales
+    const salesForCat = hasCatSales ? (catSales[c.key] || 0) : totalSales;
+    const pct = salesForCat > 0 ? (spend / salesForCat) * 100 : 0;
+    const pctEl   = document.getElementById('cat-'+c.key);
+    const detailEl= document.getElementById('cat-'+c.key+'-detail');
+    const barEl   = document.getElementById('cat-'+c.key+'-bar');
     if (!pctEl) return;
     if (spend === 0) {
       pctEl.textContent = '—'; pctEl.className = 'cat-pct';
@@ -1768,16 +2557,132 @@ function renderCategoryBreakdown() {
     } else {
       pctEl.textContent = fmtPct(pct);
       pctEl.className = 'cat-pct ' + cogsClass(pct);
-      detailEl.textContent = fmt$(spend) + ' spend · ' + combined[c.key].count + ' items';
-      // Bar width: % of total spend
+      const salesNote = hasCatSales && salesForCat>0 ? ` vs ${fmt$(salesForCat)} sales` : '';
+      detailEl.textContent = fmt$(spend) + ' spend' + salesNote;
       const barPct = totalSpend > 0 ? (spend/totalSpend)*100 : 0;
       if (barEl) barEl.style.width = barPct + '%';
     }
   });
+
+  // Show/hide category sales source note
+  const noteEl = document.getElementById('cat-breakdown-note');
+  if(noteEl) noteEl.style.display = hasCatSales ? 'block' : 'none';
 }
 
 // ══════════════════════════════════════════════
-// MENU COSTING & SHRINKAGE
+// RECENT INVOICES
+// ══════════════════════════════════════════════
+function renderRecentInvoices() {
+  const el = document.getElementById('recent-invoices-list');
+  if (!el || activeBar==='combined') {
+    if(el) el.innerHTML='<div class="empty-state">Switch to a specific bar to view invoices</div>';
+    return;
+  }
+
+  const days = parseInt(document.getElementById('invoice-history-range')?.value||'30');
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-days);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+
+  const purchases = (S().purchases||[]).filter(p=>p.date>=cutoffStr);
+  if (!purchases.length) {
+    el.innerHTML='<div class="empty-state">No purchases in this period</div>';
+    return;
+  }
+
+  // Group by invoiceNumber (or fallback key = vendor+date)
+  const invoiceMap = {};
+  purchases.forEach(p => {
+    const key = p.invoiceNumber
+      ? `inv_${p.invoiceNumber}`
+      : `manual_${p.vendor||'Unknown'}_${p.date}`;
+    if (!invoiceMap[key]) {
+      invoiceMap[key] = {
+        invoiceNumber: p.invoiceNumber||null,
+        vendor: p.vendor||'Unknown Vendor',
+        date: p.date,
+        items: [],
+        total: 0,
+        isManual: !p.invoiceNumber
+      };
+    }
+    invoiceMap[key].items.push(p);
+    invoiceMap[key].total += (p.total||p.cost*p.qty||0);
+    // Use earliest date in group
+    if (p.date < invoiceMap[key].date) invoiceMap[key].date = p.date;
+  });
+
+  // Sort by date descending
+  const invoices = Object.entries(invoiceMap)
+    .sort((a,b)=>b[1].date.localeCompare(a[1].date));
+
+  el.innerHTML = invoices.map(([key, inv]) => {
+    const dateStr = new Date(inv.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const label = inv.invoiceNumber ? `#${inv.invoiceNumber}` : (inv.isManual ? 'Manual Entry' : 'No Invoice #');
+    const catCounts = {};
+    inv.items.forEach(i=>{ catCounts[i.cat]=(catCounts[i.cat]||0)+1; });
+    const catTags = Object.entries(catCounts).map(([c,n])=>
+      `<span style="font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:2px;background:rgba(212,168,67,0.1);color:var(--accent);">${c} ×${n}</span>`
+    ).join(' ');
+
+    const rowsHtml = inv.items.map(i=>`
+      <tr style="border-top:1px solid var(--border);">
+        <td style="padding:5px 10px;font-size:12px;">${escHtml(i.item)}</td>
+        <td style="padding:5px 10px;font-size:11px;font-family:var(--mono);color:var(--accent);">${i.cat}</td>
+        <td style="padding:5px 10px;font-size:12px;text-align:right;font-family:var(--mono);">${fmt$(i.cost)}</td>
+        <td style="padding:5px 10px;font-size:12px;text-align:right;font-family:var(--mono);">${i.qty}</td>
+        <td style="padding:5px 10px;font-size:12px;text-align:right;font-family:var(--mono);">${fmt$(i.total||i.cost*i.qty)}</td>
+      </tr>`).join('');
+
+    return `
+    <div style="border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;">
+      <!-- Header row — always visible -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);cursor:pointer;gap:12px;"
+        onclick="toggleInvoiceDetail('${key}')">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);min-width:120px;">${label}</div>
+          <div style="font-size:13px;font-weight:600;">${escHtml(inv.vendor)}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">${dateStr}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">${catTags}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-shrink:0;">
+          <div style="font-family:var(--mono);font-size:13px;color:var(--text);">${fmt$(inv.total)}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${inv.items.length} items</div>
+          <div id="inv-chevron-${key}" style="color:var(--muted);font-size:12px;transition:transform 0.2s;">▼</div>
+        </div>
+      </div>
+      <!-- Detail rows — toggled -->
+      <div id="inv-detail-${key}" style="display:none;">
+        <table style="width:100%;border-collapse:collapse;background:var(--surface2);">
+          <thead>
+            <tr style="border-top:1px solid var(--border);">
+              <th style="padding:5px 10px;text-align:left;font-family:var(--mono);font-size:10px;color:var(--muted);">ITEM</th>
+              <th style="padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--muted);">CAT</th>
+              <th style="padding:5px 10px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--muted);">UNIT COST</th>
+              <th style="padding:5px 10px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--muted);">QTY</th>
+              <th style="padding:5px 10px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--muted);">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr style="border-top:1px solid var(--border);">
+              <td colspan="4" style="padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;">INVOICE TOTAL</td>
+              <td style="padding:6px 10px;font-family:var(--mono);font-size:13px;font-weight:600;text-align:right;">${fmt$(inv.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleInvoiceDetail(key) {
+  const detail  = document.getElementById('inv-detail-'+key);
+  const chevron = document.getElementById('inv-chevron-'+key);
+  if (!detail) return;
+  const open = detail.style.display==='none';
+  detail.style.display  = open ? 'block' : 'none';
+  if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
+}
 // ══════════════════════════════════════════════
 // menuItem: { id, name, cat, sellPrice, avgWeeklyUnits, ingredients:[{name,unit,amount,costPerUnit}] }
 
@@ -2014,7 +2919,7 @@ function renderShrinkageDashboard(){
 function tryCarryForward() {
   if (activeBar==='combined') return;
   const weeks = S().weeks;
-  if (!weeks.length) return;
+  if (!weeks.length) { updatePosDateBanner(); return; }
   const lastWeek = weeks[weeks.length-1];
   const entryStartEl = document.getElementById('entry-start');
   const hintEl = document.getElementById('carry-forward-hint');
@@ -2024,6 +2929,138 @@ function tryCarryForward() {
     if (hintEl) hintEl.style.display = 'block';
     updatePreview();
   }
+  // Carry forward the end date of last week as start date for new week
+  const startDateEl = document.getElementById('entry-start-date');
+  if (startDateEl && !startDateEl.value && lastWeek.endDate) {
+    startDateEl.value = lastWeek.endDate;
+  }
+  updatePosDateBanner();
+}
+
+// ══════════════════════════════════════════════
+// POS DATE RANGE BANNER
+// ══════════════════════════════════════════════
+function updatePosDateBanner() {
+  const banner  = document.getElementById('pos-date-banner');
+  const rangeEl = document.getElementById('pos-date-range-text');
+  const subEl   = document.getElementById('pos-date-range-sub');
+  if (!banner) return;
+
+  const startVal = document.getElementById('entry-start-date')?.value;
+  const endVal   = document.getElementById('entry-end-date')?.value;
+
+  const fmtDT = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    if (isNaN(d)) return null;
+    return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) +
+      ' at ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+  };
+
+  const startFmt = fmtDT(startVal);
+  const endFmt   = fmtDT(endVal);
+
+  if (startFmt && endFmt) {
+    banner.style.display = 'block';
+    rangeEl.textContent  = startFmt + '  →  ' + endFmt;
+    subEl.textContent    = 'Run your POS report for exactly this date/time range';
+    banner.style.background   = 'rgba(39,174,96,0.08)';
+    banner.style.borderColor  = 'rgba(39,174,96,0.3)';
+  } else if (startFmt && !endFmt) {
+    banner.style.display = 'block';
+    rangeEl.textContent  = startFmt + '  →  ??? (end count not yet entered)';
+    subEl.textContent    = 'Enter your end count date/time above to see the full POS range';
+    banner.style.background  = 'rgba(212,168,67,0.08)';
+    banner.style.borderColor = 'rgba(212,168,67,0.3)';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════
+// AUTO-FILL PURCHASES FROM PURCHASES TAB
+// ══════════════════════════════════════════════
+function autoFillPurchases() {
+  if (activeBar==='combined') { showToast('Switch to a specific bar first', true); return; }
+
+  const weekVal = document.getElementById('entry-week').value;
+  if (!weekVal) { showToast('Select a week first', true); return; }
+
+  // Get the Monday–Sunday date range for the selected week
+  const [y, wk] = weekVal.split('-W');
+  const jan1 = new Date(+y, 0, 1);
+  // ISO week: find the Monday of the given week
+  const dayOfWeek = jan1.getDay() || 7; // 1=Mon...7=Sun
+  const weekStart = new Date(jan1);
+  weekStart.setDate(jan1.getDate() + (parseInt(wk) - 1) * 7 - (dayOfWeek - 1));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  const startStr = weekStart.toISOString().slice(0, 10);
+  const endStr   = weekEnd.toISOString().slice(0, 10);
+
+  // Sum all purchases whose date falls within this week
+  const purchases = S().purchases || [];
+  const weekPurchases = purchases.filter(p => p.date >= startStr && p.date <= endStr);
+
+  if (!weekPurchases.length) {
+    showToast(`No purchases found between ${startStr} and ${endStr}`, true);
+    return;
+  }
+
+  const total = weekPurchases.reduce((s, p) => s + (p.total || p.cost * p.qty || 0), 0);
+
+  // Category breakdown for the hint
+  const byCat = {};
+  weekPurchases.forEach(p => {
+    const c = p.cat || 'Other';
+    byCat[c] = (byCat[c] || 0) + (p.total || p.cost * p.qty || 0);
+  });
+  const catSummary = Object.entries(byCat)
+    .sort((a,b) => b[1]-a[1])
+    .map(([c,v]) => `${c} ${fmt$(v)}`)
+    .join(' · ');
+
+  document.getElementById('entry-purchases').value = total.toFixed(2);
+
+  const hintEl = document.getElementById('purchases-autofill-hint');
+  if (hintEl) {
+    hintEl.style.display = 'block';
+    hintEl.innerHTML = `↑ ${weekPurchases.length} purchases · ${catSummary}`;
+  }
+
+  updatePreview();
+  showToast(`✓ ${fmt$(total)} from ${weekPurchases.length} purchases (${startStr} – ${endStr})`);
+}
+
+function renderDashboardPosReminder() {
+  const el = document.getElementById('dashboard-pos-reminder');
+  if (!el || activeBar==='combined') { if(el) el.style.display='none'; return; }
+  const weeks = S().weeks;
+  if (!weeks.length) { el.style.display='none'; return; }
+  const last = weeks[weeks.length-1];
+  if (!last.endDate) { el.style.display='none'; return; }
+
+  const fmtDT = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    if (isNaN(d)) return null;
+    return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) +
+      ' at ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+  };
+
+  const startFmt = fmtDT(last.endDate);
+  if (!startFmt) { el.style.display='none'; return; }
+
+  el.style.display = 'block';
+  el.innerHTML = `<div style="padding:12px 16px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:3px;">📅 NEXT POS REPORT — START FROM</div>
+      <div style="font-family:var(--display);font-size:18px;letter-spacing:1px;">${startFmt}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;">This is when your last inventory count ended — your next POS report starts here</div>
+    </div>
+    <button class="btn btn-outline" style="font-size:11px;" onclick="switchTab('weekly')">→ Enter New Week</button>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -2278,6 +3315,266 @@ function renderDepletion() {
       }).join('')}
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════
+// PAR & ORDERING
+// ══════════════════════════════════════════════
+
+// parSettings stored per bar in state
+function getParSettings() {
+  if (!S().parSettings) S().parSettings = { deliveryDays:[1,4], bufferDays:1, rounding:'up', customPars:{} };
+  return S().parSettings;
+}
+
+function saveParSettings() {
+  const ps = getParSettings();
+  ps.bufferDays = parseInt(document.getElementById('par-buffer-days').value)||1;
+  ps.rounding   = document.getElementById('par-rounding').value;
+  saveLocal();
+}
+
+function toggleDeliveryDay(day) {
+  const ps = getParSettings();
+  const idx = ps.deliveryDays.indexOf(day);
+  if (idx>=0) ps.deliveryDays.splice(idx,1); else ps.deliveryDays.push(day);
+  saveLocal(); renderDeliveryDayButtons(); renderPar();
+}
+
+function renderDeliveryDayButtons() {
+  const ps = getParSettings();
+  document.querySelectorAll('.day-btn').forEach(btn=>{
+    const day = parseInt(btn.dataset.day);
+    btn.classList.toggle('active', ps.deliveryDays.includes(day));
+  });
+}
+
+function daysUntilNextDelivery(ps) {
+  if (!ps.deliveryDays.length) return 7;
+  const today = new Date().getDay();
+  let min = 7;
+  ps.deliveryDays.forEach(d=>{
+    let diff = d - today;
+    if (diff <= 0) diff += 7;
+    if (diff < min) min = diff;
+  });
+  return min;
+}
+
+// Build per-product depletion stats from depletion entries
+function calcDepletionStats() {
+  const deps = S().depletions || [];
+  if (!deps.length) return {};
+
+  // Group by product
+  const byProduct = {};
+  deps.forEach(d => {
+    const key = d.product.toLowerCase().trim();
+    if (!byProduct[key]) byProduct[key] = { product:d.product, cat:d.cat, sizeKey:d.sizeKey, costPerBottle:d.costPerBottle, weeks:[] };
+    const depleted = Math.max(0, d.startCount - d.endCount);
+    byProduct[key].weeks.push({ week:d.week, depleted, endCount:d.endCount, costPerBottle:d.costPerBottle||byProduct[key].costPerBottle });
+    // Always use most recent cost
+    if (d.costPerBottle > 0) byProduct[key].costPerBottle = d.costPerBottle;
+  });
+
+  // Calculate stats per product
+  Object.values(byProduct).forEach(p => {
+    p.weeks.sort((a,b)=>a.week.localeCompare(b.week));
+    const depletions = p.weeks.map(w=>w.depleted);
+    p.avgPerWeek = depletions.reduce((s,v)=>s+v,0) / depletions.length;
+    p.maxPerWeek = Math.max(...depletions);
+    p.minPerWeek = Math.min(...depletions);
+    p.weekCount  = depletions.length;
+    p.trend      = depletions.slice(-4); // last 4 weeks for sparkline
+    // Estimate current on hand from most recent end count
+    p.estOnHand  = p.weeks[p.weeks.length-1].endCount;
+  });
+
+  return byProduct;
+}
+
+function calcSuggestedPar(avgPerWeek, ps) {
+  const daysToDelivery = daysUntilNextDelivery(ps) + (ps.bufferDays||1);
+  const weeksToDelivery = daysToDelivery / 7;
+  const raw = avgPerWeek * weeksToDelivery;
+  if (ps.rounding === 'up')      return Math.ceil(raw * 10) / 10;
+  if (ps.rounding === 'nearest') return Math.round(raw * 10) / 10;
+  return Math.round(raw * 100) / 100;
+}
+
+function renderPar() {
+  if (activeBar === 'combined') {
+    document.getElementById('par-table-body').innerHTML = '<tr><td colspan="9" class="empty-state">Switch to a specific bar to view PAR levels</td></tr>';
+    return;
+  }
+
+  // Update bar name label
+  const barNameEl = document.getElementById('par-bar-name');
+  if (barNameEl) barNameEl.textContent = activeBar==='dh' ? 'DESERT HAWK' : 'THE LOW HORSE';
+
+  const ps = getParSettings();
+
+  // Restore UI settings
+  const bufEl = document.getElementById('par-buffer-days');
+  const rndEl = document.getElementById('par-rounding');
+  if (bufEl) bufEl.value = ps.bufferDays;
+  if (rndEl) rndEl.value = ps.rounding;
+  renderDeliveryDayButtons();
+
+  const stats = calcDepletionStats();
+  const products = Object.values(stats);
+
+  // Update stat cards
+  document.getElementById('par-stat-tracked').textContent = products.length || '—';
+  const weeksOfData = products.length ? Math.max(...products.map(p=>p.weekCount)) : 0;
+  document.getElementById('par-stat-weeks').textContent = weeksOfData || '—';
+
+  if (!products.length) {
+    document.getElementById('par-table-body').innerHTML = '<tr><td colspan="9" class="empty-state">No depletion data yet — add bottle counts in the Bottle Depletion tab first</td></tr>';
+    document.getElementById('par-stat-below').textContent = '—';
+    document.getElementById('par-stat-value').textContent = '—';
+    document.getElementById('par-alert-row').style.display = 'none';
+    document.getElementById('par-order-section').style.display = 'none';
+    return;
+  }
+
+  // Low data warning
+  const infoBox = document.getElementById('par-info-box');
+  if (weeksOfData < 3) {
+    infoBox.style.background = 'rgba(212,168,67,0.08)';
+    infoBox.style.borderColor = 'rgba(212,168,67,0.3)';
+    infoBox.innerHTML = `⚠ Only ${weeksOfData} week${weeksOfData!==1?'s':''} of data — suggestions will improve with more history. Aim for 4+ weeks for reliable PARs.`;
+  } else {
+    infoBox.style.background = '';
+    infoBox.style.borderColor = '';
+    infoBox.innerHTML = `PAR levels based on ${weeksOfData} weeks of depletion data. Click any PAR value to override it manually.`;
+  }
+
+  // Build table rows
+  let belowCount = 0, orderValue = 0;
+  const orderItems = [];
+
+  const rows = products.map(p => {
+    const suggested = calcSuggestedPar(p.avgPerWeek, ps);
+    const customPar = ps.customPars?.[p.product.toLowerCase().trim()];
+    const parLevel  = customPar !== undefined ? customPar : suggested;
+    const need      = Math.max(0, parLevel - p.estOnHand);
+    const needRounded = ps.rounding==='up' ? Math.ceil(need*10)/10 : ps.rounding==='nearest' ? Math.round(need*10)/10 : Math.round(need*100)/100;
+    const cost      = needRounded * p.costPerBottle;
+    const status    = p.estOnHand <= 0 ? 'below' : p.estOnHand < parLevel * 0.5 ? 'below' : p.estOnHand < parLevel ? 'warn' : 'ok';
+
+    if (status === 'below' || status === 'warn') {
+      belowCount++;
+      orderValue += cost;
+      orderItems.push({ ...p, parLevel, need:needRounded, cost, status });
+    }
+
+    // Trend sparkline
+    const maxTrend = Math.max(...p.trend, 0.1);
+    const sparkline = p.trend.map(v => {
+      const h = Math.max(2, Math.round((v/maxTrend)*16));
+      const color = v > p.avgPerWeek * 1.2 ? 'var(--accent2)' : v < p.avgPerWeek * 0.8 ? 'var(--green)' : 'var(--accent)';
+      return `<div class="trend-bar" style="height:${h}px;background:${color}"></div>`;
+    }).join('');
+
+    const statusClass = status==='below'?'par-below':status==='warn'?'par-warn':'par-ok';
+    const onHandDisplay = `<span class="${statusClass}">${p.estOnHand.toFixed(1)}</span>`;
+    const needDisplay   = needRounded > 0 ? `<span class="par-below">${needRounded.toFixed(1)}</span>` : '<span class="par-ok">—</span>';
+    const productKey    = p.product.toLowerCase().trim().replace(/'/g,"\\'");
+
+    return `<tr>
+      <td><strong>${escHtml(p.product)}</strong></td>
+      <td><span class="badge" style="background:rgba(212,168,67,0.1);color:var(--accent)">${p.cat}</span></td>
+      <td class="num">${p.avgPerWeek.toFixed(1)} btl</td>
+      <td class="num" style="color:var(--muted)">${suggested.toFixed(1)}</td>
+      <td class="num"><span class="par-editable" onclick="editCustomPar('${productKey}',${parLevel})" title="Click to override">${parLevel.toFixed(1)}</span></td>
+      <td class="num">${onHandDisplay}</td>
+      <td class="num">${needDisplay}</td>
+      <td class="num">${needRounded > 0 ? fmt$(cost) : '—'}</td>
+      <td><div class="trend-sparkline">${sparkline}</div></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('par-table-body').innerHTML = rows;
+  document.getElementById('par-stat-below').textContent = belowCount || '0';
+  document.getElementById('par-stat-value').textContent = orderValue > 0 ? fmt$(orderValue) : '$0';
+
+  // Alert row
+  const alertRow = document.getElementById('par-alert-row');
+  if (belowCount > 0) {
+    alertRow.style.display = 'block';
+    alertRow.innerHTML = `<div style="padding:12px 16px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.25);border-radius:6px;font-family:var(--mono);font-size:12px;">
+      🔴 <strong style="color:var(--accent2)">${belowCount} product${belowCount!==1?'s':''} below PAR</strong> — estimated order value <strong>${fmt$(orderValue)}</strong>. 
+      Next delivery in ~${daysUntilNextDelivery(ps)} day${daysUntilNextDelivery(ps)!==1?'s':''}.
+    </div>`;
+  } else {
+    alertRow.style.display = 'none';
+  }
+
+  // Order list
+  const orderSection = document.getElementById('par-order-section');
+  if (orderItems.length) {
+    orderSection.style.display = 'block';
+    document.getElementById('par-order-list').innerHTML = orderItems
+      .sort((a,b) => (b.status==='below'?1:0) - (a.status==='below'?1:0))
+      .map(item => `
+        <div class="order-item ${item.status==='below'?'urgent':''}">
+          <div>
+            <div class="order-item-name">${escHtml(item.product)}</div>
+            <div class="order-item-meta">${item.cat} · PAR: ${item.parLevel.toFixed(1)} · On hand: ~${item.estOnHand.toFixed(1)} · Avg/week: ${item.avgPerWeek.toFixed(1)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="order-qty">${item.need.toFixed(1)} btl</div>
+            <div class="order-cost">${fmt$(item.cost)}</div>
+          </div>
+        </div>`).join('');
+  } else {
+    orderSection.style.display = 'none';
+  }
+}
+
+function editCustomPar(productKey, currentVal) {
+  const input = prompt(`Set custom PAR for this product (current: ${currentVal}):`, currentVal);
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val) || val < 0) { alert('Please enter a valid number'); return; }
+  const ps = getParSettings();
+  if (!ps.customPars) ps.customPars = {};
+  ps.customPars[productKey] = val;
+  saveLocal(); renderPar();
+  showToast(`PAR updated to ${val}`);
+}
+
+function exportOrderList() {
+  if (activeBar==='combined'){showToast('Switch to a specific bar first',true);return;}
+  const ps = getParSettings();
+  const stats = calcDepletionStats();
+  const products = Object.values(stats);
+  if (!products.length){showToast('No depletion data to export',true);return;}
+
+  const barName = activeBar==='dh'?'Desert Hawk':'The Low Horse';
+  const date = new Date().toLocaleDateString();
+  let csv = `${barName} — Order List — ${date}\n`;
+  csv += `Product,Category,Avg/Week,PAR Level,Est On Hand,Order Qty,Unit Cost,Order Value\n`;
+
+  products.forEach(p => {
+    const suggested = calcSuggestedPar(p.avgPerWeek, ps);
+    const customPar = ps.customPars?.[p.product.toLowerCase().trim()];
+    const parLevel  = customPar !== undefined ? customPar : suggested;
+    const need      = Math.max(0, parLevel - p.estOnHand);
+    const needRounded = ps.rounding==='up' ? Math.ceil(need*10)/10 : Math.round(need*10)/10;
+    const cost      = needRounded * p.costPerBottle;
+    if (needRounded > 0) {
+      csv += `"${p.product}","${p.cat}",${p.avgPerWeek.toFixed(1)},${parLevel.toFixed(1)},${p.estOnHand.toFixed(1)},${needRounded.toFixed(1)},${p.costPerBottle.toFixed(2)},${cost.toFixed(2)}\n`;
+    }
+  });
+
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${barName.replace(' ','_')}_OrderList_${date.replace(/\//g,'-')}.csv`;
+  a.click();
+  showToast('Order list exported');
 }
 
 // ══════════════════════════════════════════════
