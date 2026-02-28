@@ -682,8 +682,33 @@ input::placeholder{color:var(--muted);}
         <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click any row to view price history chart</div>
       </div>
       <div class="table-wrap">
-        <table><thead><tr><th>Product</th><th>Category</th><th>Current Price</th><th>Previous Price</th><th>Change</th><th>Since First Purchase</th><th>Last Updated</th><th>All-Time Low</th><th>All-Time High</th><th>Data Points</th></tr></thead>
-        <tbody id="prices-table-body"><tr><td colspan="10" class="empty-state">Add purchases to track price history</td></tr></tbody></table>
+        <table style="table-layout:fixed;min-width:900px;">
+          <colgroup>
+            <col style="width:22%"><!-- Product -->
+            <col style="width:8%"> <!-- Category -->
+            <col style="width:9%"> <!-- Current -->
+            <col style="width:9%"> <!-- Previous -->
+            <col style="width:8%"> <!-- Change -->
+            <col style="width:13%"><!-- Since First -->
+            <col style="width:10%"><!-- Last Updated -->
+            <col style="width:8%"> <!-- Low -->
+            <col style="width:8%"> <!-- High -->
+            <col style="width:5%"> <!-- Points -->
+          </colgroup>
+          <thead><tr>
+            <th>Product</th>
+            <th>Cat</th>
+            <th style="text-align:right;">Current</th>
+            <th style="text-align:right;">Previous</th>
+            <th style="text-align:right;">Change</th>
+            <th style="text-align:right;">Since First</th>
+            <th>Last Updated</th>
+            <th style="text-align:right;">Low</th>
+            <th style="text-align:right;">High</th>
+            <th style="text-align:right;">#</th>
+          </tr></thead>
+          <tbody id="prices-table-body"><tr><td colspan="10" class="empty-state">Add purchases to track price history</td></tr></tbody>
+        </table>
       </div>
     </div>
 
@@ -1498,13 +1523,13 @@ function renderPrices(){
       sinceFirst=`<span class="${d>0?'price-up':d<0?'price-down':''}">${d>0?'+':''}${fmt$(d)} (${d>0?'+':''}${pct}%)</span>`;
     }
     return`<tr style="cursor:pointer;" onclick="openPriceModal('${escHtml(k)}')" title="Click to view price history chart">
-      <td>${escHtml(ph.item)}</td>
-      <td>${ph.cat}</td>
+      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;" title="${escHtml(ph.item)}">${escHtml(ph.item)}</td>
+      <td style="white-space:nowrap;">${ph.cat}</td>
       <td class="num">${fmt$(current)}</td>
       <td class="num">${prev!==null?fmt$(prev):'—'}</td>
-      <td>${chg}</td>
-      <td>${sinceFirst}</td>
-      <td>${hist[hist.length-1].date}</td>
+      <td class="num">${chg}</td>
+      <td class="num" style="white-space:nowrap;">${sinceFirst}</td>
+      <td style="white-space:nowrap;font-size:11px;">${hist[hist.length-1].date}</td>
       <td class="num" style="color:var(--green)">${fmt$(low)}</td>
       <td class="num" style="color:var(--accent2)">${fmt$(high)}</td>
       <td class="num" style="color:var(--muted)">${hist.length}</td>
