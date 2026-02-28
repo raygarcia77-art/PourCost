@@ -106,6 +106,9 @@ main{padding:28px 32px;max-width:1200px;margin:0 auto;}
 /* ── SECTION ── */
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .section-title{font-family:var(--display);font-size:20px;letter-spacing:2px;}
+.sec-toggle{background:none;border:1px solid var(--border);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color 0.15s,border-color 0.15s;}
+.sec-toggle:hover{border-color:var(--accent);color:var(--accent);}
+.sec-body{}
 
 /* ── UPLOAD ── */
 .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
@@ -499,6 +502,7 @@ input::placeholder{color:var(--muted);}
       </div>
 
       <div class="section-header"><div class="section-title">RECENT WEEKS</div></div>
+      </div><!-- /sec-weekly-form -->
       <div class="table-wrap">
         <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Status</th></tr></thead>
         <tbody id="history-table-body"><tr><td colspan="8" class="empty-state">No data yet</td></tr></tbody></table>
@@ -533,8 +537,9 @@ input::placeholder{color:var(--muted);}
         <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="pos-status"></div></div>
       </div>
       <hr class="divider">
-      <div class="section-header"><div class="section-title">MANUAL ENTRY</div></div>
+      <div class="section-header"><div class="section-title">MANUAL ENTRY</div><button class="sec-toggle" id="sec-btn-weekly-form" onclick="secToggle('weekly-form')" title="Collapse/Expand">−</button></div>
 
+      <div class="sec-body" id="sec-weekly-form">
       <!-- POS Date Range Reminder Banner -->
       <div id="pos-date-banner" style="display:none;margin-bottom:16px;padding:14px 18px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:6px;">
         <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">📅 POS REPORT DATE RANGE</div>
@@ -625,7 +630,9 @@ input::placeholder{color:var(--muted);}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
           <div style="font-family:var(--display);font-size:17px;letter-spacing:2px;">SCAN INVOICE</div>
           <div style="font-size:10px;background:rgba(212,168,67,0.15);color:var(--accent);padding:3px 8px;border-radius:3px;font-family:var(--mono);">AI-POWERED</div>
+          <button class="sec-toggle" id="sec-btn-pur-scan" onclick="secToggle('pur-scan')" title="Collapse/Expand" style="margin-left:auto;">−</button>
         </div>
+      <div class="sec-body" id="sec-pur-scan">
         <div class="scan-drop" 
           onclick="document.getElementById('invoice-file').click()"
           ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='var(--accent)'"
@@ -646,6 +653,7 @@ input::placeholder{color:var(--muted);}
           </div>
         </div>
       </div>
+      </div><!-- /sec-pur-scan -->
       <hr class="divider">
 
       <!-- Recent Invoices -->
@@ -658,19 +666,26 @@ input::placeholder{color:var(--muted);}
             <option value="90">Last 90 days</option>
             <option value="9999">All time</option>
           </select>
+          <button class="sec-toggle" id="sec-btn-pur-invoices" onclick="secToggle('pur-invoices')" title="Collapse/Expand">−</button>
         </div>
       </div>
+      <div class="sec-body" id="sec-pur-invoices">
       <div id="recent-invoices-list" style="margin-bottom:20px;">
         <div class="empty-state">No invoices yet</div>
       </div>
+      </div><!-- /sec-pur-invoices -->
 
       <hr class="divider">
 
       <!-- Bar Transfers -->
       <div class="section-header">
         <div class="section-title">TRANSFER BETWEEN BARS</div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Moves product between Desert Hawk and Low Horse — updates both bars automatically</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Updates both bars automatically</div>
+          <button class="sec-toggle" id="sec-btn-pur-xfr" onclick="secToggle('pur-xfr')" title="Collapse/Expand">−</button>
+        </div>
       </div>
+      <div class="sec-body" id="sec-pur-xfr">
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px;">
         <div class="form-group" style="margin:0;min-width:130px;">
           <label>From</label>
@@ -721,9 +736,11 @@ input::placeholder{color:var(--muted);}
         <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;">RECENT TRANSFERS</div>
         <div id="transfer-history-list"></div>
       </div>
+      </div><!-- /sec-pur-xfr -->
 
       <hr class="divider">
-      <div class="section-header"><div class="section-title">MANUAL ENTRY</div></div>
+      <div class="section-header"><div class="section-title">MANUAL ENTRY</div><button class="sec-toggle" id="sec-btn-pur-manual" onclick="secToggle('pur-manual')" title="Collapse/Expand">−</button></div>
+      <div class="sec-body" id="sec-pur-manual">
       <div class="form-grid" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 1fr auto;">
         <div class="form-group"><label>Date</label><input type="date" id="pur-date"></div>
         <div class="form-group"><label>Item / Product</label><input type="text" id="pur-item" placeholder="e.g. Tito's Vodka 1.75L"></div>
@@ -733,6 +750,7 @@ input::placeholder{color:var(--muted);}
         <div class="form-group"><label>Vendor</label><input type="text" id="pur-vendor" placeholder="Distributor"></div>
         <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addPurchase()">+ ADD</button></div>
       </div>
+      </div><!-- /sec-pur-manual -->
       <div class="table-wrap">
         <table><thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Vendor</th><th>Unit Cost</th><th>Qty</th><th>Total</th><th>Sync</th><th></th></tr></thead>
         <tbody id="purchases-table-body"><tr><td colspan="9" class="empty-state">No purchases recorded yet</td></tr></tbody></table>
@@ -799,7 +817,8 @@ input::placeholder{color:var(--muted);}
         <div class="wc-summary-card"><div class="wc-summary-label">% of Sales</div><div class="wc-summary-value" id="wc-pct-sales">—</div></div>
       </div>
 
-      <div class="section-header"><div class="section-title">ADD ENTRY</div></div>
+      <div class="section-header"><div class="section-title">ADD ENTRY</div><button class="sec-toggle" id="sec-btn-wc-add" onclick="secToggle('wc-add')" title="Collapse/Expand">−</button></div>
+      <div class="sec-body" id="sec-wc-add">
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1.5fr auto;margin-bottom:20px;">
         <div class="form-group"><label>Date</label><input type="date" id="wc-date"></div>
         <div class="form-group"><label>Type</label>
@@ -1435,6 +1454,38 @@ function fmtPct(v){return parseFloat(v||0).toFixed(1)+'%';}
 function cogsBadge(pct){if(pct<=24)return'<span class="badge badge-good">Good</span>';if(pct<=30)return'<span class="badge badge-warn">Watch</span>';return'<span class="badge badge-bad">High</span>';}
 function cogsClass(pct){return pct<=24?'good':pct<=30?'warn':'bad';}
 function syncChip(s){return s?'<span style="color:var(--green);font-size:10px;" title="Synced">●</span>':'<span style="color:var(--accent);font-size:10px;" title="Pending sync">○</span>';}
+function secToggle(id) {
+  const body = document.getElementById('sec-'+id);
+  const btn  = document.getElementById('sec-btn-'+id);
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  if (btn) btn.textContent = hidden ? '−' : '+';
+  // Remember state
+  try {
+    const s = JSON.parse(localStorage.getItem('pourcost_sec')||'{}');
+    s[id] = hidden ? 'open' : 'closed';
+    localStorage.setItem('pourcost_sec', JSON.stringify(s));
+  } catch(e){}
+}
+function initSecToggles() {
+  try {
+    const s = JSON.parse(localStorage.getItem('pourcost_sec')||'{}');
+    Object.entries(s).forEach(([id, state]) => {
+      const body = document.getElementById('sec-'+id);
+      const btn  = document.getElementById('sec-btn-'+id);
+      if (!body) return;
+      if (state === 'closed') {
+        body.style.display = 'none';
+        if (btn) btn.textContent = '+';
+      } else {
+        body.style.display = '';
+        if (btn) btn.textContent = '−';
+      }
+    });
+  } catch(e){}
+}
+
 function escHtml(s){
   return String(s||'')
     .replace(/&/g,'\x26amp;')
@@ -4192,8 +4243,9 @@ function initApp(){
   document.getElementById('currentWeekLabel').textContent='Week of '+getWeekLabel(wkStr);
   ['entry-start','entry-purchases','entry-end','entry-sales'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updatePreview);});
   if(lastSyncTime)document.getElementById('last-sync-time').textContent='Last sync: '+lastSyncTime.toLocaleString();
-  switchBar('dh'); // default to Desert Hawk
+  switchBar('dh');
   renderAll();
+  initSecToggles();
 }
 
 async function main(){
