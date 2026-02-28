@@ -1604,8 +1604,9 @@ function renderHistory(){
 // INVOICE SCAN
 // ══════════════════════════════════════════════
 let pendingInvoiceItems=[];
-let pendingInvoiceNumber=null; // invoice # extracted from CSV, used for dupe detection
-let pendingInvoiceDate=null;   // invoice date extracted from CSV, used for purchase records
+let pendingInvoiceNumber=null;
+let pendingInvoiceDate=null;
+let pendingInvoiceVendor=null;
 function handleInvoiceDrop(event) {
   const file = event.dataTransfer?.files?.[0];
   if (!file) return;
@@ -1631,9 +1632,10 @@ async function handleInvoiceFile(file) {
   // ── CSV path — no AI needed ──
   if (isCSV) {
     const text = await file.text();
-    const { items, invoiceNumber, invoiceDate } = parseInvoiceCSV(text, file.name);
+    const { items, invoiceNumber, invoiceDate, detectedVendor } = parseInvoiceCSV(text, file.name);
     pendingInvoiceNumber = invoiceNumber || null;
     pendingInvoiceDate   = invoiceDate   || null;
+    pendingInvoiceVendor = detectedVendor || null;
     document.getElementById('scan-loading').style.display='none';
     if (invoiceNumber && checkDuplicateInvoice(invoiceNumber)) return;
     showInvoiceResults(items, invoiceNumber ? `CSV parsed · Invoice #${invoiceNumber}` : 'CSV parsed');
@@ -1744,8 +1746,16 @@ function showInvoiceResults(items, source) {
   };
 
   document.getElementById('ai-result-content').innerHTML=`
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;">
-      ✓ ${source} — ${items.length} items found · <span style="color:var(--accent)">Edit any field · toggle btl/case for cases</span>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">
+        ✓ ${source} — ${items.length} items found · <span style="color:var(--accent)">Edit any field · toggle btl/case for cases</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <label style="font-family:var(--mono);font-size:10px;color:var(--muted);">VENDOR:</label>
+        <input type="text" id="invoice-vendor-field" value="${escHtml(pendingInvoiceVendor||'')}" placeholder="e.g. Breakthru Beverage"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:4px 8px;border-radius:3px;font-size:12px;font-family:var(--mono);width:180px;"
+          oninput="pendingInvoiceVendor=this.value">
+      </div>
     </div>
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;" id="invoice-edit-table">
@@ -1896,11 +1906,14 @@ function parseInvoiceCSV(text, filename) {
     const raw = firstRow[invoiceNumCol]?.replace(/"/g,'').trim();
     if (raw && raw.length > 0) invoiceNumber = raw;
   }
-  // Also try extracting from filename e.g. Invoice-0125803552.csv
+  // Also try extracting from filename
   if (!invoiceNumber) {
     const m = filename.match(/[Ii]nvoice[-_]?(\d{6,})/);
     if (m) invoiceNumber = m[1];
   }
+
+  // Detect vendor — filename first, then header fingerprint
+  const detectedVendor = guessVendorFromFilename(filename) || guessVendorFromHeaders(headers);
 
   const itemCol       = findCol('item description','description','product','item name','brand','name');
   const qtyCol        = findCol('quantity','qty','ordered','units','count','bottles','cases');
@@ -1981,12 +1994,12 @@ function parseInvoiceCSV(text, filename) {
       category: guessCategory(item),
       unitCost: Math.round(perBottleCost*100)/100,
       qty: bottleQty,
-      vendor: vendor || guessVendorFromFilename(filename),
+      vendor: vendor || detectedVendor || guessVendorFromFilename(filename),
       uom,
       unitsPerPack
     });
   }
-  return { items, invoiceNumber, invoiceDate };
+  return { items, invoiceNumber, invoiceDate, detectedVendor };
 }
 
 // Excel parsing using SheetJS if available, otherwise fallback message
@@ -2008,9 +2021,33 @@ function parseInvoiceExcel(buffer) {
 }
 
 function guessVendorFromFilename(filename) {
-  const known = ['southern','glazer','republic','breakthru','rndc','johnson brothers','charmer','Total Wine','fintech'];
+  const known = [
+    ['breakthru', 'Breakthru Beverage'],
+    ['southern', 'Southern Glazer\'s'],
+    ['glazer', 'Southern Glazer\'s'],
+    ['republic', 'Republic National'],
+    ['rndc', 'RNDC'],
+    ['johnson', 'Johnson Brothers'],
+    ['charmer', 'Charmer'],
+    ['lakeshore', 'Lakeshore Beverage'],
+    ['fintech', 'FinTech'],
+  ];
   const n = filename.toLowerCase();
-  for (const v of known) { if (n.includes(v.toLowerCase())) return v; }
+  for (const [key, name] of known) { if (n.includes(key)) return name; }
+  return '';
+}
+
+// Fingerprint CSV column headers to identify distributor even without vendor column
+function guessVendorFromHeaders(headers) {
+  const h = headers.join('|').toLowerCase();
+  // Breakthru Beverage: has 'kegdeposits', 'splitcase', 'customer number'
+  if (h.includes('kegdeposits') && h.includes('splitcase')) return 'Breakthru Beverage';
+  // Southern Glazer's: typically has 'brand', 'size', 'proof'
+  if (h.includes('proof') && h.includes('brand')) return "Southern Glazer's";
+  // RNDC: typically has 'div name' or 'division'
+  if (h.includes('div name') || (h.includes('division') && h.includes('brand'))) return 'RNDC';
+  // Johnson Brothers: typically has 'ship to name'
+  if (h.includes('ship to name') && h.includes('item number')) return 'Johnson Brothers';
   return '';
 }
 // Check if invoice number was already imported — returns true if duplicate (and shows warning)
@@ -2045,6 +2082,7 @@ function forceImportAnyway() {
 function confirmInvoiceItems(){
   // Use invoice date if available, otherwise today
   const date = pendingInvoiceDate || new Date().toISOString().slice(0,10);
+  const vendor = pendingInvoiceVendor || '';
   const active = pendingInvoiceItems.filter(i=>i!==null);
   active.forEach(i=>{
     S().purchases.push({
@@ -2055,7 +2093,7 @@ function confirmInvoiceItems(){
       cost:i.unitCost||0,
       qty:i.qty||1,
       total:(i.unitCost||0)*(i.qty||1),
-      vendor:i.vendor||'',
+      vendor: i.vendor || vendor,
       invoiceNumber:pendingInvoiceNumber||'',
       synced:false
     });
@@ -2069,9 +2107,9 @@ function confirmInvoiceItems(){
   }
   saveLocal();renderPurchasesTable();renderPrices();renderRecentInvoices();clearScan();
   showToast(`✓ ${active.length} items added to ${BARS[activeBar].name} · dated ${date}`);
-  scheduleSync();pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;
+  scheduleSync();pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;pendingInvoiceVendor=null;
 }
-function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;}
+function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;pendingInvoiceVendor=null;}
 
 // ══════════════════════════════════════════════
 // CSV UPLOAD
