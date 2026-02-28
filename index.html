@@ -638,12 +638,40 @@ input::placeholder{color:var(--muted);}
           ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='var(--accent)'"
           ondragleave="this.style.borderColor=''"
           ondrop="event.preventDefault();event.stopPropagation();this.style.borderColor='';handleInvoiceDrop(event)">
-          <input type="file" id="invoice-file" accept="image/*,.pdf,.csv,.xlsx,.xls" onchange="handleInvoiceScan(this)" style="display:none">
+          <input type="file" id="invoice-file" accept="image/*,.pdf,.csv,.xlsx,.xls" multiple onchange="handleInvoiceScan(this)" style="display:none">
           <div style="font-size:28px;margin-bottom:8px;">📄</div>
-          <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Drop invoice here — PDF, image, or CSV</div>
-          <div style="font-size:12px;color:var(--muted);">AI reads PDFs and images · CSV/Excel parsed automatically</div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Drop invoices here — PDF, image, or CSV</div>
+          <div style="font-size:12px;color:var(--muted);">Select multiple files at once · AI reads PDFs · CSV/Excel parsed automatically</div>
         </div>
+
+        <!-- Batch progress bar -->
+        <div id="batch-progress-wrap" style="display:none;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted);" id="batch-progress-label">Processing...</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--accent);" id="batch-progress-count"></div>
+          </div>
+          <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;">
+            <div id="batch-progress-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;width:0%;"></div>
+          </div>
+        </div>
+
         <div id="scan-loading" style="display:none;text-align:center;padding:16px;font-family:var(--mono);font-size:12px;color:var(--muted);">⏳ Reading invoice...</div>
+
+        <!-- Batch review panel — shows all scanned invoices before confirming -->
+        <div id="batch-review-panel" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:var(--display);font-size:16px;letter-spacing:1px;" id="batch-summary-title">BATCH REVIEW</div>
+              <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;" id="batch-summary-sub"></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="confirmAllBatch()">✓ Confirm All</button>
+              <button class="btn btn-outline" onclick="clearBatch()">✕ Clear All</button>
+            </div>
+          </div>
+          <div id="batch-invoices-list"></div>
+        </div>
+
         <div class="ai-result" id="ai-result">
           <div style="color:var(--accent);font-weight:500;margin-bottom:10px;">✓ INVOICE PARSED — Review and confirm below</div>
           <div id="ai-result-content"></div>
@@ -1063,6 +1091,35 @@ input::placeholder{color:var(--muted);}
         Your Google Sheet will have these tabs:<br>
         <span style="color:#c0841a;">DH_Weeks</span> · <span style="color:#c0841a;">DH_Purchases</span> · <span style="color:#c0841a;">DH_PriceHistory</span> · <span style="color:#c0841a;">DH_ProductMaps</span> · <span style="color:#c0841a;">DH_PosItems</span><br>
         <span style="color:#9b6abf;">LH_Weeks</span> · <span style="color:#9b6abf;">LH_Purchases</span> · <span style="color:#9b6abf;">LH_PriceHistory</span> · <span style="color:#9b6abf;">LH_ProductMaps</span> · <span style="color:#9b6abf;">LH_PosItems</span>
+      </div>
+      <hr class="divider">
+      <div class="section-header"><div class="section-title">APPS SCRIPT — INVOICE SCAN PROMPT</div></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.8;">
+        Replace the <code style="color:var(--accent);">scanInvoice</code> prompt in your Apps Script with this version — it's tuned to your exact vendors (Chicago Beverage Systems, Lakeshore, Breakthru, Southern Glazer's) for much better accuracy.
+      </div>
+      <div style="position:relative;">
+        <button onclick="navigator.clipboard.writeText(document.getElementById('apps-script-prompt').value);showToast('✓ Prompt copied to clipboard')"
+          class="btn btn-outline" style="position:absolute;top:8px;right:8px;font-size:10px;padding:4px 10px;z-index:1;">Copy</button>
+        <textarea id="apps-script-prompt" readonly
+          style="width:100%;height:220px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:12px;border-radius:6px;resize:vertical;line-height:1.6;">You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice image.
+
+VENDORS YOU WILL SEE:
+- Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. The PRICE column is the per-unit price after deposit (use this). AMOUNT = total. Skip lines with "EMPTY KEG", "POS", "MISCELLANEOUS".
+- Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
+- Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
+- Southern Glazer's: columns LOC CASES BTLS SIZE DESCRIPTION PACK NET BTL PRICE UNIT PRICE DIV CDE UNIT DISCOUNT NET AMOUNT. UNIT PRICE = per bottle price. NET AMOUNT = line total. Skip "COOK COUNTY ALCOHOL TAX", "CHICAGO ALCOHOL EXCISE TAX", "DELIVERY CHARGE" lines — these are tax rows not products.
+
+RULES:
+1. Return ONLY a JSON array, no other text.
+2. Each item: {"item": "product name", "qty": number, "unitCost": cost_per_unit, "total": line_total, "cat": category, "invoiceNumber": "...", "invoiceDate": "YYYY-MM-DD", "vendor": "vendor name"}
+3. Categories: "Spirits", "Beer", "Wine", "Mixers", "Other"
+4. Skip deposit lines, tax lines, service fees, empty keg credits, backordered items ($0.00 lines).
+5. For kegs: qty = number of kegs, unitCost = price per keg.
+6. For cases: qty = number of cases, unitCost = price per case.
+7. Include invoiceNumber, invoiceDate, and vendor on EVERY item (same value for all items on the same invoice).
+8. invoiceDate format: YYYY-MM-DD
+
+Return only the JSON array.</textarea>
       </div>
     </div>
 
@@ -1982,35 +2039,52 @@ function renderHistory(){
 }
 
 // ══════════════════════════════════════════════
-// INVOICE SCAN
+// INVOICE SCAN — BATCH PROCESSING
 // ══════════════════════════════════════════════
 let pendingInvoiceItems=[];
 let pendingInvoiceNumber=null;
 let pendingInvoiceDate=null;
 let pendingInvoiceVendor=null;
+
+// Batch state
+let batchQueue = [];       // files waiting to process
+let batchResults = [];     // { fileName, items, invoiceNumber, invoiceDate, vendor, source, error }
+let batchProcessing = false;
+
 function handleInvoiceDrop(event) {
-  const file = event.dataTransfer?.files?.[0];
-  if (!file) return;
-  // Feed into the same handler as file picker
-  handleInvoiceFile(file);
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (!files.length) return;
+  if (files.length === 1) {
+    handleInvoiceFile(files[0]);
+  } else {
+    startBatch(files);
+  }
 }
 
 async function handleInvoiceScan(input) {
-  if (!input.files[0]) return;
+  if (!input.files.length) return;
   if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
-  handleInvoiceFile(input.files[0]);
+  const files = Array.from(input.files);
+  if (files.length === 1) {
+    handleInvoiceFile(files[0]);
+  } else {
+    startBatch(files);
+  }
+  // Reset input so same files can be re-selected
+  input.value = '';
 }
 
+// ── Single file handler (unchanged behaviour) ──
 async function handleInvoiceFile(file) {
   if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
   document.getElementById('scan-loading').style.display='block';
   document.getElementById('ai-result').classList.remove('show');
+  document.getElementById('batch-review-panel').style.display='none';
 
   const name = file.name.toLowerCase();
   const isCSV  = name.endsWith('.csv');
   const isExcel= name.endsWith('.xlsx') || name.endsWith('.xls');
 
-  // ── CSV path — no AI needed ──
   if (isCSV) {
     const text = await file.text();
     const { items, invoiceNumber, invoiceDate, detectedVendor } = parseInvoiceCSV(text, file.name);
@@ -2023,7 +2097,6 @@ async function handleInvoiceFile(file) {
     return;
   }
 
-  // ── Excel path ──
   if (isExcel) {
     const buffer = await file.arrayBuffer();
     const items = parseInvoiceExcel(buffer, file.name);
@@ -2032,22 +2105,17 @@ async function handleInvoiceFile(file) {
     return;
   }
 
-  // ── PDF / image — route through Apps Script AI ──
+  // PDF / image — AI
   const base64 = await new Promise((res,rej)=>{
     const r=new FileReader();
     r.onload=()=>res(r.result.split(',')[1]);
     r.onerror=rej;
     r.readAsDataURL(file);
   });
-  const mt = file.type || 'image/jpeg';
+  const mt = file.type || 'application/pdf';
 
   try {
-    const result = await gasRequest({
-      action: 'scanInvoice',
-      mediaType: mt,
-      imageData: base64
-    });
-
+    const result = await gasRequest({ action:'scanInvoice', mediaType:mt, imageData:base64 });
     document.getElementById('scan-loading').style.display='none';
     let items = [];
     try { items = JSON.parse((result.text||'[]').replace(/```json|```/g,'').trim()); } catch(e) {}
@@ -2056,12 +2124,221 @@ async function handleInvoiceFile(file) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
     document.getElementById('ai-result-content').innerHTML=`<span style="color:var(--accent2)">
-      ${isScriptError
-        ? 'Invoice scanning requires an updated Apps Script with the scanInvoice action, or enter items manually below.'
-        : 'Error: '+e.message}
+      ${isScriptError ? 'Invoice scanning requires an updated Apps Script. Enter items manually below.' : 'Error: '+e.message}
     </span>`;
     document.getElementById('ai-result').classList.add('show');
   }
+}
+
+// ── Batch processing ──
+async function startBatch(files) {
+  if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
+  batchQueue = [...files];
+  batchResults = [];
+  batchProcessing = true;
+
+  document.getElementById('ai-result').classList.remove('show');
+  document.getElementById('scan-loading').style.display='none';
+  document.getElementById('batch-review-panel').style.display='none';
+  document.getElementById('batch-progress-wrap').style.display='block';
+
+  const total = batchQueue.length;
+  for (let i=0; i<batchQueue.length; i++) {
+    const file = batchQueue[i];
+    updateBatchProgress(i, total, file.name);
+    const result = await processSingleForBatch(file);
+    batchResults.push(result);
+  }
+
+  document.getElementById('batch-progress-wrap').style.display='none';
+  batchProcessing = false;
+  renderBatchReview();
+}
+
+function updateBatchProgress(current, total, fileName) {
+  const pct = Math.round((current/total)*100);
+  document.getElementById('batch-progress-bar').style.width = pct+'%';
+  document.getElementById('batch-progress-label').textContent = `⏳ Processing ${current+1} of ${total}: ${fileName}`;
+  document.getElementById('batch-progress-count').textContent = `${current}/${total} done`;
+}
+
+async function processSingleForBatch(file) {
+  const name = file.name.toLowerCase();
+  const result = { fileName:file.name, items:[], invoiceNumber:null, invoiceDate:null, vendor:null, source:'', error:null, confirmed:false };
+
+  try {
+    if (name.endsWith('.csv')) {
+      const text = await file.text();
+      const parsed = parseInvoiceCSV(text, file.name);
+      result.items = parsed.items;
+      result.invoiceNumber = parsed.invoiceNumber || null;
+      result.invoiceDate   = parsed.invoiceDate   || null;
+      result.vendor        = parsed.detectedVendor|| null;
+      result.source = 'CSV';
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      const buffer = await file.arrayBuffer();
+      result.items  = parseInvoiceExcel(buffer, file.name);
+      result.source = 'Excel';
+    } else {
+      // PDF / image via AI
+      const base64 = await new Promise((res,rej)=>{
+        const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file);
+      });
+      const mt = file.type || 'application/pdf';
+      const aiResult = await gasRequest({ action:'scanInvoice', mediaType:mt, imageData:base64 });
+      try { result.items = JSON.parse((aiResult.text||'[]').replace(/```json|```/g,'').trim()); } catch(e) { result.items=[]; }
+      // Try to detect vendor from the raw AI response text
+      if (!result.vendor) result.vendor = guessVendorFromContent(aiResult.text||'') || guessVendorFromFilename(file.name);
+      // Extract invoice metadata from first item if AI embedded it
+      if (result.items.length && result.items[0].invoiceNumber) result.invoiceNumber = result.items[0].invoiceNumber;
+      if (result.items.length && result.items[0].invoiceDate)   result.invoiceDate   = result.items[0].invoiceDate;
+      if (result.items.length && result.items[0].vendor)        result.vendor        = result.items[0].vendor || result.vendor;
+      result.source = 'AI';
+    }
+  } catch(e) {
+    result.error = e.message;
+  }
+
+  // Auto-fill vendor/date/invoiceNumber defaults
+  if (!result.vendor) result.vendor = '';
+  if (!result.invoiceDate) result.invoiceDate = new Date().toISOString().slice(0,10);
+
+  return result;
+}
+
+function renderBatchReview() {
+  const panel = document.getElementById('batch-review-panel');
+  const list  = document.getElementById('batch-invoices-list');
+  const sub   = document.getElementById('batch-summary-sub');
+
+  const total    = batchResults.length;
+  const ok       = batchResults.filter(r=>r.items.length>0).length;
+  const errored  = batchResults.filter(r=>r.error||r.items.length===0).length;
+  const allItems = batchResults.reduce((s,r)=>s+r.items.length,0);
+  const allTotal = batchResults.reduce((s,r)=>s+r.items.reduce((ss,it)=>ss+(it.total||0),0),0);
+
+  sub.textContent = `${total} invoices · ${ok} parsed successfully · ${allItems} line items · ${fmt$(allTotal)} total`;
+  if (errored) sub.textContent += ` · ⚠ ${errored} failed`;
+
+  list.innerHTML = batchResults.map((r, ri) => {
+    const invTotal = r.items.reduce((s,it)=>s+(it.total||0),0);
+    const statusColor = r.error||r.items.length===0 ? 'var(--accent2)' : 'var(--green)';
+    const statusIcon  = r.error||r.items.length===0 ? '✗' : '✓';
+
+    const itemRows = r.items.map((item, idx) => `
+      <tr id="batch-row-${ri}-${idx}">
+        <td><input value="${escHtml(item.item||'')}" oninput="batchResults[${ri}].items[${idx}].item=this.value"
+          style="width:100%;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;"></td>
+        <td><select onchange="batchResults[${ri}].items[${idx}].cat=this.value"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:2px 4px;border-radius:3px;">
+          ${['Spirits','Beer','Wine','Mixers','Other'].map(c=>`<option${c===item.cat?' selected':''}>${c}</option>`).join('')}
+        </select></td>
+        <td style="text-align:right;"><input type="number" value="${(item.cost||item.unitCost||0).toFixed(2)}"
+          oninput="batchResults[${ri}].items[${idx}].cost=parseFloat(this.value)||0;batchResults[${ri}].items[${idx}].unitCost=parseFloat(this.value)||0"
+          style="width:70px;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;text-align:right;"></td>
+        <td style="text-align:right;"><input type="number" value="${item.qty||1}"
+          oninput="batchResults[${ri}].items[${idx}].qty=parseFloat(this.value)||1"
+          style="width:50px;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;text-align:right;"></td>
+        <td style="text-align:right;" id="batch-total-${ri}-${idx}">${fmt$((item.total)||(item.cost||item.unitCost||0)*(item.qty||1))}</td>
+        <td style="text-align:right;">
+          <button onclick="batchResults[${ri}].items.splice(${idx},1);renderBatchReview()"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;">✕</button>
+        </td>
+      </tr>`).join('');
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;">
+      <!-- Invoice header -->
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);cursor:pointer;flex-wrap:wrap;"
+           onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <div style="font-size:16px;color:${statusColor};">${statusIcon}</div>
+        <div style="flex:1;min-width:120px;">
+          <div style="font-family:var(--mono);font-size:12px;font-weight:600;">${escHtml(r.fileName)}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${r.source} · ${r.items.length} items · ${fmt$(invTotal)}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" onclick="event.stopPropagation()">
+          <input type="text" value="${escHtml(r.vendor||'')}" placeholder="Vendor"
+            oninput="batchResults[${ri}].vendor=this.value"
+            style="font-family:var(--mono);font-size:11px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:3px;width:140px;">
+          <input type="date" value="${r.invoiceDate||''}"
+            oninput="batchResults[${ri}].invoiceDate=this.value"
+            style="font-family:var(--mono);font-size:11px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:3px;">
+          ${r.error||r.items.length===0
+            ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent2);">Failed to parse</span>`
+            : `<button class="btn btn-primary" style="padding:4px 12px;font-size:11px;" onclick="confirmSingleBatch(${ri})">✓ Confirm</button>`}
+          <button onclick="batchResults.splice(${ri},1);renderBatchReview()"
+            style="background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Remove</button>
+        </div>
+      </div>
+      <!-- Line items (collapsed by default) -->
+      <div style="display:none;">
+        ${r.items.length ? `<div style="overflow-x:auto;padding:0 0 8px 0;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:var(--surface2);">
+              <th style="padding:6px 12px;font-size:9px;color:var(--muted);text-align:left;">ITEM</th>
+              <th style="padding:6px 12px;font-size:9px;color:var(--muted);text-align:left;">CAT</th>
+              <th style="padding:6px 12px;font-size:9px;color:var(--muted);text-align:right;">COST/UNIT</th>
+              <th style="padding:6px 12px;font-size:9px;color:var(--muted);text-align:right;">QTY</th>
+              <th style="padding:6px 12px;font-size:9px;color:var(--muted);text-align:right;">TOTAL</th>
+              <th style="padding:6px 4px;"></th>
+            </tr></thead>
+            <tbody style="font-family:var(--mono);">${itemRows}</tbody>
+          </table></div>` : `<div class="empty-state" style="padding:16px;">No items could be extracted from this file</div>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  panel.style.display = 'block';
+}
+
+function confirmSingleBatch(ri) {
+  const r = batchResults[ri];
+  if (!r || r.items.length === 0) return;
+
+  const date   = r.invoiceDate || new Date().toISOString().slice(0,10);
+  const vendor = r.vendor || 'Unknown';
+  const invNum = r.invoiceNumber || null;
+
+  const items = r.items.filter(Boolean);
+  let added = 0;
+  items.forEach(item => {
+    const cost  = item.unitCost || item.cost || 0;
+    const qty   = item.qty || 1;
+    const total = item.total || (cost * qty);
+    S().purchases.push({
+      id: 'pur_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      date, item:item.item, cat:item.cat||'Other', cost, qty, total, vendor,
+      invoiceNumber: invNum, synced:false
+    });
+    updatePriceHistory(item.item, item.cat||'Other', cost, date, invNum);
+    added++;
+  });
+
+  if (invNum) S().invoiceNumbers = [...(S().invoiceNumbers||[]), invNum];
+  saveLocal();
+  scheduleSync();
+  batchResults[ri].confirmed = true;
+  showToast(`✓ ${added} items added from ${r.fileName}`);
+  renderBatchReview();
+  renderPurchasesTable();
+  renderRecentInvoices();
+}
+
+function confirmAllBatch() {
+  const unconfirmed = batchResults.filter(r => !r.confirmed && r.items.length > 0);
+  if (!unconfirmed.length) { showToast('Nothing left to confirm'); return; }
+  unconfirmed.forEach((r, i) => {
+    const ri = batchResults.indexOf(r);
+    confirmSingleBatch(ri);
+  });
+  showToast(`✓ All ${unconfirmed.length} invoices confirmed`);
+  setTimeout(clearBatch, 800);
+}
+
+function clearBatch() {
+  batchResults = [];
+  batchQueue   = [];
+  document.getElementById('batch-review-panel').style.display='none';
+  document.getElementById('batch-progress-wrap').style.display='none';
 }
 
 // Show parsed invoice items in the result panel
@@ -2228,23 +2505,34 @@ function removeInvoiceRow(idx) {
   if (row) row.style.display = 'none';
 }
 
-// Guess category from product name
+// Guess category from product name — tuned to your actual vendors
 function guessCategory(name) {
   // Check learned category from price history first (most accurate)
   const key = (name||'').toLowerCase().trim();
   const bar = activeBar==='combined' ? 'dh' : activeBar;
   const learned = states[bar]?.priceHistory?.[key]?.cat;
   if (learned) return learned;
-  // Also check the other bar's history
   const otherBar = bar==='dh' ? 'lh' : 'dh';
   const learnedOther = states[otherBar]?.priceHistory?.[key]?.cat;
   if (learnedOther) return learnedOther;
-  // Fall back to keyword matching
+
   const n = key;
-  if (/vodka|whiskey|whisky|bourbon|scotch|gin|rum|tequila|mezcal|brandy|cognac|liqueur|schnapps|triple sec|amaretto|kahlua|baileys|fireball|jack|jim beam|maker|patron|grey goose|titos|hennessy|brbn|vdk|teq/.test(n)) return 'Spirits';
-  if (/beer|lager|ale|ipa|stout|porter|seltzer|cider|corona|modelo|bud|miller|coors|heineken|stella|dos equis|white claw|truly|keg|high noon|pils|hefe/.test(n)) return 'Beer';
-  if (/wine|chardonnay|cabernet|merlot|pinot|sauvignon|riesling|prosecco|champagne|rose|ros|malbec|shiraz|syrah|cab sauv/.test(n)) return 'Wine';
-  if (/juice|syrup|soda|water|tonic|ginger|mix|grenadine|lime|lemon|agave|simple|bitters|vermouth|sour|cream|milk|sugar|salt|red bull|energy/.test(n)) return 'Mixers';
+
+  // Skip deposit/tax/fee lines — these should not be imported as purchases
+  if (/empty keg|keg deposit|cook county|chicago alcohol|excise tax|service fee|delivery charge|deposit|miscellaneous|mstar|pos$/.test(n)) return null;
+
+  // Spirits — expanded for your actual inventory
+  if (/vodka|whiskey|whisky|bourbon|scotch|gin|rum|tequila|mezcal|brandy|cognac|liqueur|schnapps|triple sec|amaretto|kahlua|baileys|fireball|fernet|aperol|campari|aperitivo|amaro|bitters|vermouth|absinthe|maraschino|jagermeister|jägermeister|malort|malört|schnapps|sambuca|grappa|pisco|sake|shochu|buffalo trace|tito|maker|patron|casamigos|siete leguas|pueblo viejo|jose cuervo|gran centenario|tequila ocho|del maguey|los vecinos|jameson|tullamore|bushmills|johnnie|macallan|glenlivet|bulleit|woodford|weller|four roses|angel envy|high west|old forester|basil hayden|knob creek|ezra brooks|elijah craig|evan williams|wild turkey|rye|espolon|olmeca|herradura|don julio|patrón|volcan|cincoro|clase azul|codigo|lalo|milagro|arette|lunazul|corazon|avion|cabresto|el silencio|putaendo|zackariah|northern harvest|malört|fernet|mr black|pathfinder|ramazzotti|st george|luxardo|sipsmith|sipsmith|angostura|peychaud|prophecy|whitehaven|sauvignon|malbec|cab|pinot|chardonnay|riesling|prosecco|champagne|rose|sparkling|cava/.test(n)) return 'Spirits';
+
+  // Beer — kegs, cases, cans
+  if (/beer|lager|ale|ipa|stout|porter|seltzer|cider|corona|modelo|bud|miller|coors|heineken|stella|dos equis|white claw|truly|keg|high noon|pils|hefe|weiss|weizen|gose|saison|wit|blanc|k 50l|k 1\/2|1\/2 bbl|half barrel|half bbl|guinness|half acre|mhl|allagash|pacifico|warpigs|firestone|paulaner|weihenstephan|busch|michelob|natty|pbr|pabst|lagunitas|sierra nevada|dogfish|new belgium|sam adams|anchor|bells|founders|goose island|revolution|three floyds|off color|marz|hop|hazy|ipa|neipa|lager|pilsner|pale ale|amber|red ale|brown ale|wheat|hefeweizen|dunkel|märzen|oktoberfest|bock|schwarzbier|kolsch|kölsch|cream ale|golden|blonde|session|sour|gose|berliner|farmhouse|saison|tripel|dubbel|quad|belgian|abbey|trappist|bdb|bob|bos|brn|bub|coors|hamms|keystone|rolling rock|stroh|old style|pony pilsner|foggy geezer|hope shaker|nutr|nutrl|liq dth/.test(n)) return 'Beer';
+
+  // Wine
+  if (/wine|chardonnay|cabernet|merlot|pinot|sauvignon blanc|riesling|prosecco|champagne|rosé|rosato|malbec|shiraz|syrah|cab sauv|zinfandel|grenache|tempranillo|sangiovese|nebbiolo|barbera|dolcetto|montepulciano|chianti|brunello|barolo|amarone|valpolicella|soave|pinot grigio|albariño|gewurztraminer|viognier|roussanne|marsanne|chenin|muscadet|chablis|burgundy|bordeaux|rhone|rioja|port|sherry|madeira|marsala|vermouth|sekt|crémant|cava|moscato|riesling|gewurz|gruner|veltliner/.test(n)) return 'Wine';
+
+  // Mixers / NA
+  if (/juice|syrup|soda|tonic|ginger beer|ginger ale|mix|grenadine|lime juice|lemon|agave|simple syrup|bitters|sour mix|cream|milk|sugar|salt|red bull|energy|monster|celsius|olipop|q mixer|fever tree|schweppes|canada dry|dr pepper|coke|pepsi|sprite|7up|squirt|jarritos|agua fresca|na |non.alc|non-alc|sparkling water|still water|mineral water|perrier|pellegrino|club soda|seltzer water|pathfinder|liq dth sparkl|liq dth water/.test(n)) return 'Mixers';
+
   return 'Other';
 }
 
@@ -2404,13 +2692,18 @@ function parseInvoiceExcel(buffer) {
 function guessVendorFromFilename(filename) {
   const known = [
     ['breakthru', 'Breakthru Beverage'],
-    ['southern', 'Southern Glazer\'s'],
-    ['glazer', 'Southern Glazer\'s'],
+    ['southern', "Southern Glazer's"],
+    ['glazer', "Southern Glazer's"],
+    ['sgws', "Southern Glazer's"],
     ['republic', 'Republic National'],
     ['rndc', 'RNDC'],
     ['johnson', 'Johnson Brothers'],
     ['charmer', 'Charmer'],
     ['lakeshore', 'Lakeshore Beverage'],
+    ['lake shore', 'Lakeshore Beverage'],
+    ['chicago bev', 'Chicago Beverage Systems'],
+    ['cbs', 'Chicago Beverage Systems'],
+    ['sipmarket', 'Chicago Beverage Systems'],
     ['fintech', 'FinTech'],
   ];
   const n = filename.toLowerCase();
@@ -2418,16 +2711,25 @@ function guessVendorFromFilename(filename) {
   return '';
 }
 
+// Detect vendor from raw text content (works for AI-parsed PDFs)
+function guessVendorFromContent(text) {
+  if (!text) return '';
+  const t = text.toLowerCase();
+  if (t.includes('chicago beverage systems') || t.includes('sipmarket.com') || t.includes('cbsarshared')) return 'Chicago Beverage Systems';
+  if (t.includes('lakeshore beverage') || t.includes('4300 s halsted')) return 'Lakeshore Beverage';
+  if (t.includes('breakthru beverage') || t.includes('breakthrubev.com') || t.includes('berwyn, il 60402')) return 'Breakthru Beverage';
+  if (t.includes("southern glazer's") || t.includes('southern glazers') || t.includes('2971 collection center')) return "Southern Glazer's";
+  if (t.includes('republic national') || t.includes('rndc')) return 'Republic National';
+  if (t.includes('johnson brothers')) return 'Johnson Brothers';
+  return '';
+}
+
 // Fingerprint CSV column headers to identify distributor even without vendor column
 function guessVendorFromHeaders(headers) {
   const h = headers.join('|').toLowerCase();
-  // Breakthru Beverage: has 'kegdeposits', 'splitcase', 'customer number'
   if (h.includes('kegdeposits') && h.includes('splitcase')) return 'Breakthru Beverage';
-  // Southern Glazer's: typically has 'brand', 'size', 'proof'
   if (h.includes('proof') && h.includes('brand')) return "Southern Glazer's";
-  // RNDC: typically has 'div name' or 'division'
   if (h.includes('div name') || (h.includes('division') && h.includes('brand'))) return 'RNDC';
-  // Johnson Brothers: typically has 'ship to name'
   if (h.includes('ship to name') && h.includes('item number')) return 'Johnson Brothers';
   return '';
 }
