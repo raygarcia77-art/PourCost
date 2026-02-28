@@ -1055,6 +1055,7 @@ input::placeholder{color:var(--muted);}
       <div class="info-box" id="connection-status-box">Checking connection...</div>
       <div class="settings-row">
         <div class="form-group" style="grid-column:1/-1"><label>Google Apps Script URL</label><input type="text" id="settings-script-url" placeholder="https://script.google.com/macros/s/.../exec"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Claude API Key (for invoice scanning)</label><input type="password" id="settings-claude-key" placeholder="sk-ant-..."></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;">
         <button class="btn btn-primary" onclick="saveSettings()">Save &amp; Test Connection</button>
@@ -1236,7 +1237,7 @@ function emptyBarState() {
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
-let config = { scriptUrl: 'https://script.google.com/macros/s/AKfycbzeqM_hxIfhicMtrY5Z9yHHlPnMMXkttt-cAlBvSxAJgG2pxXo0yvlS-fFGwQ85XtY6/exec' };
+let config = { scriptUrl: 'https://script.google.com/macros/s/AKfycbzeqM_hxIfhicMtrY5Z9yHHlPnMMXkttt-cAlBvSxAJgG2pxXo0yvlS-fFGwQ85XtY6/exec', claudeKey: '' };
 let isOnline = navigator.onLine;
 let lastSyncTime = null;
 let syncInProgress = false;
@@ -1298,13 +1299,65 @@ function skipSetup() {
 // ══════════════════════════════════════════════
 async function gasRequest(params) {
   if (!config.scriptUrl) throw new Error('Not configured — add your Apps Script URL in Settings');
-  // Apps Script redirects POST to GET, so we send data as a query param
   const url = config.scriptUrl + '?body=' + encodeURIComponent(JSON.stringify(params));
   const res = await fetch(url, { method: 'GET', redirect: 'follow' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
   if (data.status !== 'ok') throw new Error(data.error || data.message || 'Script error');
   return data.data !== undefined ? data.data : data;
+}
+
+// Call Claude API directly from browser (avoids Apps Script CORS issues for large PDFs)
+async function scanInvoiceWithClaude(base64, mimeType) {
+  if (!config.claudeKey) throw new Error('Add your Claude API key in Settings to enable invoice scanning');
+  const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice image.
+
+VENDORS YOU WILL SEE:
+- Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. The PRICE column is the per-unit price after deposit (use this). AMOUNT = total. Skip lines with "EMPTY KEG", "POS", "MISCELLANEOUS".
+- Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
+- Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
+- Southern Glazer's: columns LOC CASES BTLS SIZE DESCRIPTION PACK NET BTL PRICE UNIT PRICE DIV CDE UNIT DISCOUNT NET AMOUNT. UNIT PRICE = per bottle price. NET AMOUNT = line total. Skip "COOK COUNTY ALCOHOL TAX", "CHICAGO ALCOHOL EXCISE TAX", "DELIVERY CHARGE" lines.
+
+RULES:
+1. Return ONLY a JSON array, no other text, no markdown, no code fences.
+2. Each item: {"item": "product name", "qty": number, "unitCost": cost_per_unit, "total": line_total, "cat": category, "invoiceNumber": "...", "invoiceDate": "YYYY-MM-DD", "vendor": "vendor name"}
+3. Categories: "Spirits", "Beer", "Wine", "Mixers", "Other"
+4. Skip deposit lines, tax lines, service fees, empty keg credits, backordered items ($0.00 lines).
+5. For kegs: qty = number of kegs, unitCost = price per keg.
+6. For cases: qty = number of cases, unitCost = price per case.
+7. Include invoiceNumber, invoiceDate, and vendor on EVERY item.
+8. invoiceDate format: YYYY-MM-DD
+
+Return only the JSON array.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': config.claudeKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({error:{message:res.statusText}}));
+    throw new Error('Claude API: ' + (err.error?.message || res.statusText));
+  }
+  const data = await res.json();
+  let text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+  text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
+  return JSON.parse(text);
 }
 
 async function gasWrite(sheetName, rows) {
@@ -2116,11 +2169,9 @@ async function handleInvoiceFile(file) {
   const mt = file.type || 'application/pdf';
 
   try {
-    const result = await gasRequest({ action:'scanInvoice', mediaType:mt, imageData:base64 });
+    const items = await scanInvoiceWithClaude(base64, mt);
     document.getElementById('scan-loading').style.display='none';
-    let items = [];
-    try { items = JSON.parse((result.text||'[]').replace(/```json|```/g,'').trim()); } catch(e) {}
-    showInvoiceResults(items, 'AI scanned');
+    showInvoiceResults(Array.isArray(items) ? items : [], 'AI scanned');
   } catch(e) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
@@ -2186,11 +2237,9 @@ async function processSingleForBatch(file) {
         const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file);
       });
       const mt = file.type || 'application/pdf';
-      const aiResult = await gasRequest({ action:'scanInvoice', mediaType:mt, imageData:base64 });
-      try { result.items = JSON.parse((aiResult.text||'[]').replace(/```json|```/g,'').trim()); } catch(e) { result.items=[]; }
-      // Try to detect vendor from the raw AI response text
-      if (!result.vendor) result.vendor = guessVendorFromContent(aiResult.text||'') || guessVendorFromFilename(file.name);
-      // Extract invoice metadata from first item if AI embedded it
+      const aiItems = await scanInvoiceWithClaude(base64, mt);
+      result.items = Array.isArray(aiItems) ? aiItems : [];
+      if (!result.vendor) result.vendor = guessVendorFromFilename(file.name);
       if (result.items.length && result.items[0].invoiceNumber) result.invoiceNumber = result.items[0].invoiceNumber;
       if (result.items.length && result.items[0].invoiceDate)   result.invoiceDate   = result.items[0].invoiceDate;
       if (result.items.length && result.items[0].vendor)        result.vendor        = result.items[0].vendor || result.vendor;
@@ -3173,6 +3222,8 @@ function closePosReviewModal(){
 async function saveSettings(){
   const url=(document.getElementById('settings-script-url').value||'').trim();
   if(url) config.scriptUrl=url;
+  const ck=(document.getElementById('settings-claude-key').value||'').trim();
+  if(ck) config.claudeKey=ck;
   saveConfig();
   await initSheets();
   showToast('Settings saved');
@@ -3180,6 +3231,8 @@ async function saveSettings(){
 function renderSettings(){
   const el=document.getElementById('settings-script-url');
   if(el) el.value=config.scriptUrl||'';
+  const ck=document.getElementById('settings-claude-key');
+  if(ck) ck.value=config.claudeKey||'';
   const box=document.getElementById('connection-status-box');
   if(box) box.textContent=config.scriptUrl?'Connected via Apps Script: '+config.scriptUrl.slice(0,60)+'...':'Not configured — paste your Apps Script URL above.';
 }
