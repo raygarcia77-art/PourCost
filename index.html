@@ -2453,9 +2453,9 @@ function renderBatchReview() {
       <tr id="batch-row-${ri}-${idx}">
         <td><input value="${escHtml(item.item||'')}" oninput="batchResults[${ri}].items[${idx}].item=this.value"
           style="width:100%;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;"></td>
-        <td><select onchange="batchResults[${ri}].items[${idx}].cat=this.value"
+        <td><select onchange="batchResults[${ri}].items[${idx}].category=this.value;batchResults[${ri}].items[${idx}].cat=this.value"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:2px 4px;border-radius:3px;">
-          ${['Spirits','Beer','Wine','Mixers','Other'].map(c=>`<option${c===item.cat?' selected':''}>${c}</option>`).join('')}
+          ${['Spirits','Beer','Wine','Mixers','Other'].map(c=>`<option${(c===item.category||c===item.cat)?' selected':''}>${c}</option>`).join('')}
         </select></td>
         <td style="text-align:right;"><input type="number" value="${(item.cost||item.unitCost||0).toFixed(2)}"
           oninput="batchResults[${ri}].items[${idx}].cost=parseFloat(this.value)||0;batchResults[${ri}].items[${idx}].unitCost=parseFloat(this.value)||0"
@@ -2530,10 +2530,10 @@ function confirmSingleBatch(ri) {
     const total = item.total || (cost * qty);
     S().purchases.push({
       id: 'pur_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-      date, item:item.item, cat:item.cat||'Other', cost, qty, total, vendor,
+      date, item:item.item, cat:item.category||item.cat||'Other', cost, qty, total, vendor,
       invoiceNumber: invNum, synced:false
     });
-    updatePriceHistory(item.item, item.cat||'Other', cost, date, invNum);
+    updatePriceHistory(item.item, item.category||item.cat||'Other', cost, date, invNum);
     added++;
   });
 
@@ -2572,7 +2572,8 @@ function showInvoiceResults(items, source) {
     document.getElementById('ai-result').classList.add('show');
     return;
   }
-  pendingInvoiceItems = items;
+  // Normalize: ensure all items use 'category' field (AI returns 'cat', CSV returns 'category')
+  pendingInvoiceItems = items.map(i => ({...i, category: i.category || i.cat || 'Other'}));
   const cats = ['Spirits','Beer','Wine','Mixers','Other'];
 
   const buildRow = (i, idx) => {
@@ -3025,11 +3026,12 @@ function confirmInvoiceItems(){
     }
   }
   active.forEach(i=>{
+    const cat = i.category || i.cat || 'Other';
     S().purchases.push({
       id:Date.now()+Math.random()+'',
       date,
       item:i.item,
-      cat:i.category,
+      cat,
       cost:i.unitCost||0,
       qty:i.qty||1,
       total:(i.unitCost||0)*(i.qty||1),
@@ -3037,7 +3039,7 @@ function confirmInvoiceItems(){
       invoiceNumber:pendingInvoiceNumber||'',
       synced:false
     });
-    updatePriceHistory(i.item,i.category,i.unitCost||0,date,pendingInvoiceNumber||'');
+    updatePriceHistory(i.item,cat,i.unitCost||0,date,pendingInvoiceNumber||'');
   });
   if (pendingInvoiceNumber) {
     if (!S().invoiceNumbers) S().invoiceNumbers=[];
