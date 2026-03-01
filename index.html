@@ -2345,23 +2345,6 @@ async function handleInvoiceFile(file) {
     document.getElementById('scan-loading').style.display='none';
     if (!Array.isArray(items) || !items.length) { showInvoiceResults([], 'AI scanned — no items found'); return; }
 
-    // Inject pack sizes from our own PDF parsing into AI results
-    items.forEach(function(item) {
-      if (item.packSize && item.packSize.match(/\d+\/\d+/)) return; // AI got it, keep it
-      const key = (item.item || '').toUpperCase().trim();
-      // Try exact match first, then partial
-      if (pdfTextPackMap[key]) {
-        item.packSize = pdfTextPackMap[key];
-      } else {
-        for (var k in pdfTextPackMap) {
-          if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) {
-            item.packSize = pdfTextPackMap[k];
-            break;
-          }
-        }
-      }
-    });
-
     // Pull invoice number/date/vendor from first item
     const firstItem = items[0];
     pendingInvoiceNumber = firstItem.invoiceNumber || null;
