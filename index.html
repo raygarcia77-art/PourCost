@@ -1352,43 +1352,46 @@ async function scanInvoiceWithClaude(base64, mimeType) {
   const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
-- invoiceNumber: For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545035". Digits only.
-- invoiceDate: Invoice date (not Due Date). Breakthru: "Invoice Date: 02/18/2026" = "2026-02-18". Lakeshore: top date "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
+- invoiceNumber: For Breakthru: top-right "Invoice #: 125700868". For Southern Glazer's: "INVOICE 2187706". For Lakeshore: "Invoice#: 545035". Digits only.
+- invoiceDate: Invoice date (not Due Date). Breakthru: "Invoice Date: 02/18/2026". Southern Glazer's: "INVOICE DATE 2/18/2026". Lakeshore: top date "Wed Feb 18, 2026". Format YYYY-MM-DD.
 - vendor: Distributor name at top.
 
+SOUTHERN GLAZER'S - COLUMNS: CS ORD/DLV | BTLS ORD/DLV | ITEM | UNIT PRICE | UNIT DISC | UNIT NET AMOUNT | TAXES | TOTAL
+- CS ORD/DLV = cases ordered/delivered (format "2/2" means 2 cases). If blank or 0, item was ordered by bottle.
+- BTLS ORD/DLV = individual bottles ordered (format "1/1" means 1 bottle). If blank or 0, item was ordered by case.
+- UNIT NET AMOUNT = price per BOTTLE (after discount)
+- AMOUNT column = line total (UNIT NET × total bottles)
+- qty = total bottles: if CS has a number, qty = CS × BPC. If BTLS has a number, qty = BTLS.
+- unitCost = UNIT NET AMOUNT (per bottle)
+- total = unitCost × qty
+
+Examples from Southern Glazer's invoice 2187706:
+  CS=2, BTLS=blank, BPC=12, UNIT NET=13.50: JOSE CUERVO → qty=24, unitCost=13.50, total=324.00
+  CS=blank, BTLS=1, BPC=12, UNIT NET=36.96: CAZADORES → qty=1, unitCost=36.96, total=36.96
+  CS=2, BTLS=blank, BPC=12, UNIT NET=31.12: JAGERMEISTER → qty=24, unitCost=31.12, total=62.24  (NOT 62.16)
+  CS=blank, BTLS=1, BPC=6, UNIT NET=37.48: NOCHELUNA SOTOL → qty=1, unitCost=37.48, total=37.48  (NOT 37.50)
+- Skip DELIVERY CHARGE, tax lines, $0 lines.
+- Return "cases", "btles", "bpc" fields same as Breakthru.
+
 BREAKTHRU BEVERAGE - COLUMNS: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
-The first two columns are "Case" and "Btles" (bottles). ONLY ONE will have a number — the other is blank.
-- If Case column has a number (and Btles is blank): ordered by the CASE. qty = Case × BPC. unitCost = Ext W/O Tax / qty.
-- If Btles column has a number (and Case is blank): ordered as individual BOTTLES. qty = Btles. unitCost = Ext W/O Tax / qty.
-
-Examples from this invoice:
-  Case=blank, Btles=1, BPC=6:  WOODFORD RESERVE → qty=1 bottle, unitCost=57.29, total=57.29
-  Case=2, Btles=blank, BPC=24: HIGH NOON COCKTAIL PEACH → qty=48 cans, unitCost=96/48=2.00, total=96
-  Case=2, Btles=blank, BPC=24: RED BULL → qty=48 cans, unitCost=84.50/48=1.76, total=84.50
-  Case=1, Btles=blank, BPC=12: MARK WEST CABERNET → qty=12 bottles, unitCost=96/12=8.00, total=96
-  Case=1, Btles=blank, BPC=12: SEAGRAM'S VODKA → qty=12 bottles, unitCost=125.88/12=10.49, total=125.88
-  Case=1, Btles=blank, BPC=6:  PUEBLO VIEJO TEQUILA → qty=6 bottles, unitCost=213/6=35.50, total=213
-  Case=1, Btles=blank, BPC=6:  RAMAZZOTTI ROSATO → qty=6 bottles, unitCost=107.95/6=17.99, total=107.95
-  Case=1, Btles=blank, BPC=6:  ST GEORGE SPICED PEAR → qty=6 bottles, unitCost=153/6=25.50, total=153
-
-Return fields: "cases" = Case column value (0 if blank), "btles" = Btles column value (0 if blank), "bpc" = BPC column value.
+- Case column has number = ordered by case: qty = Case × BPC, unitCost = Ext W/O Tax / qty
+- Btles column has number = ordered as bottles: qty = Btles, unitCost = Ext W/O Tax / qty
+- total = Ext W/O Tax. Skip Service Fee lines.
 
 LAKESHORE BEVERAGE - COLUMNS: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC | D.Price | DEP | EXT
 - Append descriptor line below item name to item name.
-- Canned: "NUTRL ORANGE" + "6/4/12 CAN" below → item="NUTRL ORANGE 6/4/12 CAN", qty=QTY column
-- Kegs: "BUSCH LT" + "1/2 BBL" below → item="BUSCH LT 1/2 BBL", qty=QTY column
+- Canned: "NUTRL ORANGE" + "6/4/12 CAN" below → item="NUTRL ORANGE 6/4/12 CAN", qty=QTY
+- Kegs: "BUSCH LT" + "1/2 BBL" below → item="BUSCH LT 1/2 BBL", qty=QTY
 - unitCost=D.Price (excludes deposit). total=D.Price×qty. Skip EMPTY lines.
 
-OTHER VENDORS:
-- Chicago Beverage Systems: PRICE=per-unit. AMOUNT=line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Southern Glazer's: UNIT PRICE=per bottle. NET AMOUNT=line total. Skip tax/delivery lines.
+CHICAGO BEVERAGE SYSTEMS: PRICE=per-unit. AMOUNT=line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
 2. Each item: {"item":"name","qty":number,"unitCost":number,"total":number,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","cases":number,"btles":number,"bpc":number}
-3. cases/btles/bpc=0 for non-Breakthru vendors.
+3. cases/btles/bpc=0 for Lakeshore/CBS vendors.
 4. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Seltzers/canned cocktails=Beer. Draft kegs=Keg.
-5. Skip deposit returns, tax lines, service fees, $0 lines.
+5. Skip deposit returns, tax lines, delivery charges, service fees, $0 lines.
 
 Return only the JSON array.`;
 
