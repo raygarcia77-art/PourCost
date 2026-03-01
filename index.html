@@ -2354,8 +2354,6 @@ async function handleInvoiceFile(file) {
     // Run duplicate check before showing results
     if (pendingInvoiceNumber && checkDuplicateInvoice(pendingInvoiceNumber)) return;
     showInvoiceResults(items, 'AI scanned' + (pendingInvoiceNumber ? ' · Invoice #'+pendingInvoiceNumber : ''));
-    // DEBUG
-    console.log('=== AI RAW ITEMS ===', JSON.stringify(items, null, 2));
   } catch(e) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
