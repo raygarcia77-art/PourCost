@@ -2729,7 +2729,7 @@ function showInvoiceResults(items, source) {
         <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;">
           <table style="width:100%;border-collapse:collapse;">
             ${tableHeaders}
-            <tbody>${g.indices.map(idx => buildRow(items[idx], idx)).join('')}</tbody>
+            <tbody>${g.indices.map(idx => buildRow(pendingInvoiceItems[idx], idx)).join('')}</tbody>
           </table>
         </div>
       </div>`;
