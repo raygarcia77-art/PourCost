@@ -1352,38 +1352,39 @@ async function scanInvoiceWithClaude(base64, mimeType) {
   const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
-- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545035". Digits only.
-- invoiceDate: The invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: date at top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
+- invoiceNumber: For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545035". Digits only.
+- invoiceDate: Invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026" = "2026-02-18". For Lakeshore: top date e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
 - vendor: Distributor name at top.
 
-ITEM NAME - INCLUDE PACK/KEG DESCRIPTOR:
-For Lakeshore, there is a descriptor on the line directly below each item name. Append it to the item name.
-- Canned goods: "NUTRL ORANGE" + "6/4/12 CAN" below → item = "NUTRL ORANGE 6/4/12 CAN"
-- Kegs: "BUSCH LT" + "1/2 BBL" below → item = "BUSCH LT 1/2 BBL"
-- Kegs: "ERIS PEDESTRIN" + "1/2 BBL" below → item = "ERIS PEDESTRIN 1/2 BBL"
+BREAKTHRU BEVERAGE - COLUMN GUIDE:
+Columns: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
+- Case = number of cases ordered
+- BPC = bottles/cans per case
+- qty = Case × BPC (total individual units). Example: 2 cases × 24 BPC = qty 48
+- unitCost = Ext W/O Tax ÷ qty (cost per individual unit)
+- total = Ext W/O Tax
+- For items with BPC=1 (single bottles): qty = Case count, unitCost = CS Net
+- Append pack info to item name: "HIGH NOON COCKTAIL PEACH LOOSE CANS 24-PACK" with Case=2, BPC=24 → item = "HIGH NOON COCKTAIL PEACH 24-PACK", qty=48, unitCost=96/48=2.00, total=96
+- Skip "Service Fee" lines
 
-KEG PRICING (very important):
-- For keg items (descriptor is "1/2 BBL", "1/4 BBL", "1/6 BBL", "SLIM", "BBL"):
-  - unitCost = D.Price column (the discounted price WITHOUT deposit)
-  - total = D.Price × qty (NOT the EXT column, which includes deposit)
-  - qty = QTY column
-  - cat = "Beer"
-- The DEP column is a refundable deposit — do NOT include it in cost or total
-- Skip any line where DESCRIPTION contains "EMPTY" — these are deposit credits
+LAKESHORE BEVERAGE - COLUMN GUIDE:
+Columns: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC | D.Price | DEP | EXT
+- Descriptor on line below item name must be appended to item name
+- Canned goods: "NUTRL ORANGE" + "6/4/12 CAN" → item = "NUTRL ORANGE 6/4/12 CAN", qty = QTY column
+- Kegs: "BUSCH LT" + "1/2 BBL" → item = "BUSCH LT 1/2 BBL", qty = QTY column
+- unitCost = D.Price (excludes deposit). total = D.Price × qty. Do NOT use EXT for kegs (includes deposit).
+- Skip EMPTY deposit returns and MSTAR lines.
 
-VENDORS:
+OTHER VENDORS:
 - Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Lakeshore Beverage: D.Price = discounted unit price (use this, excludes deposit). EXT = total including deposit (do NOT use for kegs). Append descriptor to item name. Skip EMPTY and MSTAR lines.
-- Breakthru Beverage Illinois: Ext W/O Tax = line total. unitCost = Ext W/O Tax / Cases qty. Skip Service Fee lines.
 - Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name with descriptor","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
-3. qty = QTY column. unitCost = D.Price for Lakeshore. total = unitCost x qty.
-4. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Hard seltzers and canned cocktails = Beer. Kegs = Keg.
-5. Every item must have the same invoiceNumber and invoiceDate from the header.
-6. Skip EMPTY deposit returns, tax lines, service fees, $0 lines.
+2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
+3. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Hard seltzers and canned cocktails = Beer. Draft kegs = Keg.
+4. Every item must have the same invoiceNumber and invoiceDate from the header.
+5. Skip deposit returns, tax lines, service fees, $0 lines.
 
 Return only the JSON array.`;
 
@@ -2593,25 +2594,32 @@ function showInvoiceResults(items, source) {
   // Drops the LAST numeric segment (oz/ml size), multiplies the rest
   function parsePackSize(packStr) {
     if (!packStr) return 1;
-    // Extract the numeric/slash portion: "6/4/12 CAN" -> "6/4/12"
-    var m = packStr.match(/([\/0-9]+)/);
+    // Breakthru style: "24-PACK" or "12-PACK"
+    var packMatch = packStr.match(/^(\d+)[\s-]PACK$/i);
+    if (packMatch) return parseInt(packMatch[1]);
+    // Lakeshore style: "6/4/12 CAN"
+    var m = packStr.match(/([0-9\/]+)/);
     if (!m) return 1;
     var parts = m[1].split('/').map(function(p){return parseInt(p);}).filter(function(n){return !isNaN(n)&&n>0;});
     if (!parts.length) return 1;
-    if (parts.length === 1) return parts[0]; // e.g. "24 CAN" -> 24
-    // Drop last segment (oz/ml size like 12, 16, 750) if it looks like a size not a count
-    // Heuristic: if last segment is <= 1000 and >= 8 and not a round case count, it's a size
+    if (parts.length === 1) return parts[0];
     var last = parts[parts.length-1];
     var isSize = last >= 8 && parts.length >= 2;
     var nums = isSize ? parts.slice(0,-1) : parts;
     return nums.reduce(function(a,b){return a*b;},1);
   }
 
-  // Extract pack descriptor from item name (Claude appends it e.g. "NUTRL ORANGE 6/4/12 CAN")
+  // Extract pack descriptor from item name
+  // Handles: "6/4/12 CAN" (Lakeshore), "24-PACK" (Breakthru)
   function extractPackFromName(itemName) {
     if (!itemName) return '';
+    // Lakeshore style: 6/4/12 CAN
     var m = itemName.match(/(\d+\/\d+(?:\/\d+)?)\s*(?:CAN|BTL|BT|ML|OZ|LT|PK)?/i);
-    return m ? m[0].trim() : '';
+    if (m) return m[0].trim();
+    // Breakthru style: 24-PACK, 12-PACK
+    var m2 = itemName.match(/(\d+)[\s-]PACK/i);
+    if (m2) return m2[1] + '-PACK';
+    return '';
   }
   // Strip the pack descriptor from item name for clean display
   function stripPackFromName(itemName) {
@@ -2659,9 +2667,13 @@ function showInvoiceResults(items, source) {
     var qty = i.qty || 1;
     var total = i.total || ((i.unitCost||0) * qty);
     var unitCost = i.unitCost || 0;
-    // If upc > 1 and qty looks like a case count, expand to individual units
-    if (upc > 1 && qty < upc) {
-      qty = qty * upc;
+    // If upc > 1: always recalculate unitCost from total/qty
+    // If qty < upc: AI returned case count, expand to units
+    // If qty >= upc: AI already returned unit count (e.g. 48 for 2×24), just fix unitCost
+    if (upc > 1) {
+      if (qty < upc) {
+        qty = qty * upc;
+      }
       unitCost = parseFloat((total / qty).toFixed(4));
     }
     return Object.assign({}, i, {
