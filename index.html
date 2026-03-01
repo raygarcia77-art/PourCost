@@ -1297,6 +1297,8 @@ function loadLocal() {
     if (s) { const p = JSON.parse(s); states.dh = {...emptyBarState(),...(p.dh||{})}; states.lh = {...emptyBarState(),...(p.lh||{})}; }
     const c = localStorage.getItem('pourcost_config');
     if (c) config = {...config, ...JSON.parse(c)};
+    // Always use the hardcoded scriptUrl — overwrite any stale cached URL
+    config.scriptUrl = 'https://script.google.com/macros/s/AKfycbwa3OeYdif096GcKWWYm9x_UyIhe3_zCyExgLXg9d6wiLIyQM19owSKn8bccakbIPMhJw/exec';
     const ls = localStorage.getItem('pourcost_last_sync');
     if (ls) lastSyncTime = new Date(ls);
   } catch(e) {}
