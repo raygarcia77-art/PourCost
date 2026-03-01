@@ -1352,36 +1352,31 @@ async function scanInvoiceWithClaude(base64, mimeType) {
   const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
-- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right block "Invoice #: 125700868". For Lakeshore: "Invoice#: 545037". Extract digits only.
-- invoiceDate: Find "Invoice Date:" or the date near the invoice number. For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: the date at the top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
-- vendor: Distributor company name at top of invoice.
+- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545037". Digits only.
+- invoiceDate: The invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: date at top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
+- vendor: Distributor name at top.
 
-PACK SIZE PARSING (very important for canned goods):
-- Lakeshore invoices show a pack descriptor on the line below the item name, e.g. "6/4/12 CAN" or "4/6/12 CAN" or "24/12 CAN".
-- Parse these as: segments separated by "/" where the LAST segment is the can size (oz, ignore it) and the preceding numbers are multiplied together to get total units per case.
-- Examples: "6/4/12 CAN" = 6 x 4 = 24 cans per case. "4/6/12 CAN" = 4 x 6 = 24 cans. "24/12 CAN" = 24 cans. "12/750ML" = 12 bottles.
-- qty = number of cases ordered (the QTY column)
-- unitCost = EXT (line total after discount) divided by total units (cases x units per case)
-- total = EXT value
-- Add a "unitsPerCase" field with the calculated pack count (e.g. 24)
-- Add a "packSize" field with the raw descriptor string (e.g. "6/4/12 CAN")
+PACK SIZE - CRITICAL FOR LAKESHORE:
+Lakeshore invoices show a pack descriptor on the line BELOW each item name, e.g. "6/4/12 CAN" or "4/6/12 CAN" or "24/12 CAN" or "12/750ML".
+You MUST capture this in the packSize field. It is the line directly under the product name.
+Example: item "NUTRL ORANGE" has "6/4/12 CAN" on the next line. Return packSize = "6/4/12 CAN"
 
 VENDORS:
 - Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Apply pack size parsing above. Skip EMPTY MSTAR lines.
-- Breakthru Beverage Illinois: "Ext W/O Tax" = line total. unitCost = Ext W/O Tax / Cases qty. Skip Service Fee lines.
+- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. packSize = descriptor line below item name. Skip EMPTY MSTAR lines.
+- Breakthru Beverage Illinois: Ext W/O Tax = line total. unitCost = Ext W/O Tax divided by Cases qty. Skip Service Fee lines.
 - Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","unitsPerCase":number,"packSize":"string"}
-3. Categories: Spirits, Beer, Wine, Mixers, Other. Canned seltzers and hard seltzers = Beer.
-4. Every item must have the same invoiceNumber and invoiceDate from the header.
-5. Skip deposit lines, tax lines, service fees, $0 lines.
-6. Kegs: qty = kegs, unitCost = price per keg, unitsPerCase = 1.
-7. If no pack size info, set unitsPerCase = 1 and packSize = "".
+2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","packSize":"descriptor or empty string"}
+3. qty = QTY column value as shown. unitCost = per-unit cost. total = line total.
+4. Categories: Spirits, Beer, Wine, Mixers, Other. Hard seltzers and canned cocktails = Beer.
+5. Every item must have the same invoiceNumber and invoiceDate from the header.
+6. Skip deposit lines, tax lines, service fees, $0 lines.
+7. packSize: copy the pack descriptor exactly as printed (e.g. "6/4/12 CAN"). Empty string if none.
 
-Return only the JSON array.`
+Return only the JSON array.`;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1392,7 +1387,7 @@ Return only the JSON array.`
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 8096,
       messages: [{
         role: 'user',
@@ -2583,28 +2578,45 @@ function showInvoiceResults(items, source) {
     document.getElementById('ai-result').classList.add('show');
     return;
   }
-  // Parse pack size descriptor e.g. "6/4/12 CAN" -> 24 units per case
+  // Parse pack size descriptor e.g. "6/4/12 CAN" or "24/12 CAN" -> units per case
+  // Drops the LAST numeric segment (oz/ml size), multiplies the rest
   function parsePackSize(packStr) {
     if (!packStr) return 1;
-    var s = packStr.toUpperCase().replace(/[A-Z ]+$/, '').trim();
-    var parts = s.split('/').map(function(p){return parseInt(p.trim());}).filter(function(n){return !isNaN(n);});
-    if (parts.length < 2) return parts[0] || 1;
-    var nums = parts.slice(0, -1); // drop last segment (oz/ml size)
-    return nums.reduce(function(a,b){return a*b;}, 1);
+    // Extract the numeric/slash portion: "6/4/12 CAN" -> "6/4/12"
+    var m = packStr.match(/([\/0-9]+)/);
+    if (!m) return 1;
+    var parts = m[1].split('/').map(function(p){return parseInt(p);}).filter(function(n){return !isNaN(n)&&n>0;});
+    if (!parts.length) return 1;
+    if (parts.length === 1) return parts[0]; // e.g. "24 CAN" -> 24
+    // Drop last segment (oz/ml size like 12, 16, 750) if it looks like a size not a count
+    // Heuristic: if last segment is <= 1000 and >= 8 and not a round case count, it's a size
+    var last = parts[parts.length-1];
+    var isSize = last >= 8 && parts.length >= 2;
+    var nums = isSize ? parts.slice(0,-1) : parts;
+    return nums.reduce(function(a,b){return a*b;},1);
   }
 
-  // Normalize items: fix category, parse pack sizes client-side
+  // Try to find a pack descriptor in the item name/description if AI didn't return one
+  // Lakeshore puts it on the next line: "6/4/12 CAN" "4/6/12 CAN" "24/12 CAN" "12/750ML"
+  function extractPackFromName(itemName) {
+    if (!itemName) return '';
+    // Look for patterns like 6/4/12, 4/6/12, 24/12, 12/750 embedded in item name
+    var m = itemName.match(/(\d+\/\d+(?:\/\d+)?)\s*(?:CAN|BTL|BT|ML|OZ)?/i);
+    return m ? m[0].trim() : '';
+  }
+
+  // Normalize items: fix category, parse pack sizes client-side (don't rely on AI)
   pendingInvoiceItems = items.map(function(i) {
-    var packStr = i.packSize || '';
-    var parsedUpc = packStr ? parsePackSize(packStr) : 0;
-    var upc = parsedUpc > 1 ? parsedUpc : (i.unitsPerCase || i.unitsPerPack || 1);
+    // Get pack descriptor — from AI field, or extract from item name
+    var packStr = i.packSize || extractPackFromName(i.item) || '';
+    var upc = packStr ? parsePackSize(packStr) : (i.unitsPerCase || i.unitsPerPack || 1);
     var qty = i.qty || 1;
     var total = i.total || ((i.unitCost||0) * qty);
     var unitCost = i.unitCost || 0;
-    // If AI returned case-level qty (e.g. qty=1 case, upc=24), expand to individual units
-    if (upc > 1 && qty <= (i.qty||1) && qty < upc) {
+    // If upc > 1 and qty looks like a case count (small number), expand to individual units
+    if (upc > 1 && qty < upc) {
       qty = qty * upc;
-      unitCost = total / qty;
+      unitCost = parseFloat((total / qty).toFixed(4));
     }
     return Object.assign({}, i, {
       category: i.category || i.cat || 'Other',
@@ -2612,6 +2624,7 @@ function showInvoiceResults(items, source) {
       unitCost: unitCost,
       total: total,
       unitsPerPack: upc,
+      packSize: packStr,
       uom: upc > 1 ? 'CSE' : (i.uom || ''),
       trackAs: 'unit'
     });
