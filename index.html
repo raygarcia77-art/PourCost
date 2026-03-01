@@ -2363,6 +2363,7 @@ async function handleInvoiceFile(file) {
     // Run duplicate check before showing results
     if (pendingInvoiceNumber && checkDuplicateInvoice(pendingInvoiceNumber)) return;
     showInvoiceResults(items, 'AI scanned' + (pendingInvoiceNumber ? ' · Invoice #'+pendingInvoiceNumber : ''));
+    console.log('=== AI RAW ITEMS ===', JSON.stringify(items.map(function(i){return {item:i.item,qty:i.qty,unitCost:i.unitCost,total:i.total};})));
   } catch(e) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
