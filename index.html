@@ -1353,37 +1353,41 @@ async function scanInvoiceWithClaude(base64, mimeType) {
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
 - invoiceNumber: For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545035". Digits only.
-- invoiceDate: Invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026" = "2026-02-18". For Lakeshore: top date e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
+- invoiceDate: Invoice date (not Due Date). Breakthru: "Invoice Date: 02/18/2026" = "2026-02-18". Lakeshore: top date "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
 - vendor: Distributor name at top.
 
-BREAKTHRU BEVERAGE - COLUMN GUIDE:
-Columns: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
-- Case = number of cases ordered
-- BPC = bottles/cans per case
-- qty = Case × BPC (total individual units). Example: 2 cases × 24 BPC = qty 48
-- unitCost = Ext W/O Tax ÷ qty (cost per individual unit)
-- total = Ext W/O Tax
-- For items with BPC=1 (single bottles): qty = Case count, unitCost = CS Net
-- Append pack info to item name: "HIGH NOON COCKTAIL PEACH LOOSE CANS 24-PACK" with Case=2, BPC=24 → item = "HIGH NOON COCKTAIL PEACH 24-PACK", qty=48, unitCost=96/48=2.00, total=96
-- Skip "Service Fee" lines
+BREAKTHRU BEVERAGE - COLUMNS: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
+The first two columns are "Case" and "Btles" (bottles). ONLY ONE will have a number — the other is blank.
+- If Case column has a number (and Btles is blank): ordered by the CASE. qty = Case × BPC. unitCost = Ext W/O Tax / qty.
+- If Btles column has a number (and Case is blank): ordered as individual BOTTLES. qty = Btles. unitCost = Ext W/O Tax / qty.
 
-LAKESHORE BEVERAGE - COLUMN GUIDE:
-Columns: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC | D.Price | DEP | EXT
-- Descriptor on line below item name must be appended to item name
-- Canned goods: "NUTRL ORANGE" + "6/4/12 CAN" → item = "NUTRL ORANGE 6/4/12 CAN", qty = QTY column
-- Kegs: "BUSCH LT" + "1/2 BBL" → item = "BUSCH LT 1/2 BBL", qty = QTY column
-- unitCost = D.Price (excludes deposit). total = D.Price × qty. Do NOT use EXT for kegs (includes deposit).
-- Skip EMPTY deposit returns and MSTAR lines.
+Examples from this invoice:
+  Case=blank, Btles=1, BPC=6:  WOODFORD RESERVE → qty=1 bottle, unitCost=57.29, total=57.29
+  Case=2, Btles=blank, BPC=24: HIGH NOON COCKTAIL PEACH → qty=48 cans, unitCost=96/48=2.00, total=96
+  Case=2, Btles=blank, BPC=24: RED BULL → qty=48 cans, unitCost=84.50/48=1.76, total=84.50
+  Case=1, Btles=blank, BPC=12: MARK WEST CABERNET → qty=12 bottles, unitCost=96/12=8.00, total=96
+  Case=1, Btles=blank, BPC=12: SEAGRAM'S VODKA → qty=12 bottles, unitCost=125.88/12=10.49, total=125.88
+  Case=1, Btles=blank, BPC=6:  PUEBLO VIEJO TEQUILA → qty=6 bottles, unitCost=213/6=35.50, total=213
+  Case=1, Btles=blank, BPC=6:  RAMAZZOTTI ROSATO → qty=6 bottles, unitCost=107.95/6=17.99, total=107.95
+  Case=1, Btles=blank, BPC=6:  ST GEORGE SPICED PEAR → qty=6 bottles, unitCost=153/6=25.50, total=153
+
+Return fields: "cases" = Case column value (0 if blank), "btles" = Btles column value (0 if blank), "bpc" = BPC column value.
+
+LAKESHORE BEVERAGE - COLUMNS: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC | D.Price | DEP | EXT
+- Append descriptor line below item name to item name.
+- Canned: "NUTRL ORANGE" + "6/4/12 CAN" below → item="NUTRL ORANGE 6/4/12 CAN", qty=QTY column
+- Kegs: "BUSCH LT" + "1/2 BBL" below → item="BUSCH LT 1/2 BBL", qty=QTY column
+- unitCost=D.Price (excludes deposit). total=D.Price×qty. Skip EMPTY lines.
 
 OTHER VENDORS:
-- Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
+- Chicago Beverage Systems: PRICE=per-unit. AMOUNT=line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
+- Southern Glazer's: UNIT PRICE=per bottle. NET AMOUNT=line total. Skip tax/delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
-3. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Hard seltzers and canned cocktails = Beer. Draft kegs = Keg.
-4. Every item must have the same invoiceNumber and invoiceDate from the header.
+2. Each item: {"item":"name","qty":number,"unitCost":number,"total":number,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","cases":number,"btles":number,"bpc":number}
+3. cases/btles/bpc=0 for non-Breakthru vendors.
+4. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Seltzers/canned cocktails=Beer. Draft kegs=Keg.
 5. Skip deposit returns, tax lines, service fees, $0 lines.
 
 Return only the JSON array.`;
@@ -2662,18 +2666,29 @@ function showInvoiceResults(items, source) {
       });
     }
 
-    var packStr = i.packSize || extractPackFromName(itemName) || '';
-    var upc = packStr ? parsePackSize(packStr) : (i.unitsPerCase || i.unitsPerPack || 1);
+    // For Breakthru: use cases/btles/bpc to get correct qty
+    // btles > 0 = ordered as individual bottles (qty = btles)
+    // cases > 0 = ordered by the case (qty = cases × bpc)
+    var cases = i.cases || 0;
+    var btles = i.btles || 0;
+    var bpc   = i.bpc   || 0;
+    if (btles > 0) {
+      i.qty = btles;
+      i.unitCost = parseFloat(((i.total || 0) / i.qty).toFixed(4));
+    } else if (cases > 0 && bpc > 0) {
+      i.qty = cases * bpc;
+      i.unitCost = parseFloat(((i.total || 0) / i.qty).toFixed(4));
+    }
+
+    var itemNameForPack = itemName;
+    var packStr = i.packSize || extractPackFromName(itemNameForPack) || '';
+    var upc = (cases > 0 && bpc > 0) ? bpc : (packStr ? parsePackSize(packStr) : (i.unitsPerCase || i.unitsPerPack || 1));
     var qty = i.qty || 1;
     var total = i.total || ((i.unitCost||0) * qty);
     var unitCost = i.unitCost || 0;
-    // If upc > 1: always recalculate unitCost from total/qty
-    // If qty < upc: AI returned case count, expand to units
-    // If qty >= upc: AI already returned unit count (e.g. 48 for 2×24), just fix unitCost
+    // If upc > 1: expand case-count qty to units and recalc unitCost
     if (upc > 1) {
-      if (qty < upc) {
-        qty = qty * upc;
-      }
+      if (qty < upc) { qty = qty * upc; }
       unitCost = parseFloat((total / qty).toFixed(4));
     }
     return Object.assign({}, i, {
