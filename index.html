@@ -773,7 +773,7 @@ input::placeholder{color:var(--muted);}
         <div class="form-group" style="margin:0;min-width:100px;">
           <label>Category</label>
           <select id="xfr-cat" style="font-size:12px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;width:100%;">
-            <option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Other</option>
+            <option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Keg</option><option>Other</option>
           </select>
         </div>
         <div class="form-group" style="margin:0;min-width:70px;">
@@ -804,7 +804,7 @@ input::placeholder{color:var(--muted);}
       <div class="form-grid" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 1fr auto;">
         <div class="form-group"><label>Date</label><input type="date" id="pur-date"></div>
         <div class="form-group"><label>Item / Product</label><input type="text" id="pur-item" placeholder="e.g. Tito's Vodka 1.75L"></div>
-        <div class="form-group"><label>Category</label><select id="pur-cat"><option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Other</option></select></div>
+        <div class="form-group"><label>Category</label><select id="pur-cat"><option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Keg</option><option>Other</option></select></div>
         <div class="form-group"><label>Cost Per Unit $</label><input type="number" id="pur-cost" placeholder="0.00" step="0.01"></div>
         <div class="form-group"><label>Qty</label><input type="number" id="pur-qty" value="1" min="1"></div>
         <div class="form-group"><label>Vendor</label><input type="text" id="pur-vendor" placeholder="Distributor"></div>
@@ -1148,7 +1148,7 @@ VENDORS YOU WILL SEE:
 RULES:
 1. Return ONLY a JSON array, no other text.
 2. Each item: {"item": "product name", "qty": number, "unitCost": cost_per_unit, "total": line_total, "cat": category, "invoiceNumber": "...", "invoiceDate": "YYYY-MM-DD", "vendor": "vendor name"}
-3. Categories: "Spirits", "Beer", "Wine", "Mixers", "Other"
+3. Categories: "Spirits", "Beer", "Wine", "Mixers", "Keg", "Other"
 4. Skip deposit lines, tax lines, service fees, empty keg credits, backordered items ($0.00 lines).
 5. For kegs: qty = number of kegs, unitCost = price per keg.
 6. For cases: qty = number of cases, unitCost = price per case.
@@ -1195,7 +1195,7 @@ Return only the JSON array.</textarea>
     <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1fr;margin-bottom:16px;">
       <div class="form-group"><label>Menu Item Name</label><input type="text" id="recipe-name" placeholder="e.g. Old Fashioned, Bud Light Draft"></div>
       <div class="form-group"><label>Category</label>
-        <select id="recipe-cat"><option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Other</option></select>
+        <select id="recipe-cat"><option>Spirits</option><option>Beer</option><option>Wine</option><option>Mixers</option><option>Keg</option><option>Other</option></select>
       </div>
       <div class="form-group"><label>Sell Price $</label><input type="number" id="recipe-sell" placeholder="0.00" step="0.01" oninput="updateRecipeCalc()"></div>
       <div class="form-group"><label>Avg Weekly Units</label><input type="number" id="recipe-units" placeholder="0" oninput="updateRecipeCalc()"></div>
@@ -1352,29 +1352,38 @@ async function scanInvoiceWithClaude(base64, mimeType) {
   const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
-- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545037". Digits only.
+- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right "Invoice #: 125700868". For Lakeshore: "Invoice#: 545035". Digits only.
 - invoiceDate: The invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: date at top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
 - vendor: Distributor name at top.
 
-ITEM NAME - INCLUDE PACK DESCRIPTOR:
-For Lakeshore invoices, there is a pack size descriptor on the line directly below each item name (e.g. "6/4/12 CAN", "4/6/12 CAN", "24/12 CAN", "12/750ML").
-You MUST append this to the item name with a space.
-Example: item is "NUTRL ORANGE" with "6/4/12 CAN" below it → item field = "NUTRL ORANGE 6/4/12 CAN"
-Example: item is "MODELO ESPECIAL" with "24/12 CAN" below it → item field = "MODELO ESPECIAL 24/12 CAN"
+ITEM NAME - INCLUDE PACK/KEG DESCRIPTOR:
+For Lakeshore, there is a descriptor on the line directly below each item name. Append it to the item name.
+- Canned goods: "NUTRL ORANGE" + "6/4/12 CAN" below → item = "NUTRL ORANGE 6/4/12 CAN"
+- Kegs: "BUSCH LT" + "1/2 BBL" below → item = "BUSCH LT 1/2 BBL"
+- Kegs: "ERIS PEDESTRIN" + "1/2 BBL" below → item = "ERIS PEDESTRIN 1/2 BBL"
+
+KEG PRICING (very important):
+- For keg items (descriptor is "1/2 BBL", "1/4 BBL", "1/6 BBL", "SLIM", "BBL"):
+  - unitCost = D.Price column (the discounted price WITHOUT deposit)
+  - total = D.Price × qty (NOT the EXT column, which includes deposit)
+  - qty = QTY column
+  - cat = "Beer"
+- The DEP column is a refundable deposit — do NOT include it in cost or total
+- Skip any line where DESCRIPTION contains "EMPTY" — these are deposit credits
 
 VENDORS:
 - Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Append pack descriptor to item name. Skip EMPTY MSTAR lines.
-- Breakthru Beverage Illinois: Ext W/O Tax = line total. unitCost = Ext W/O Tax divided by Cases qty. Skip Service Fee lines.
+- Lakeshore Beverage: D.Price = discounted unit price (use this, excludes deposit). EXT = total including deposit (do NOT use for kegs). Append descriptor to item name. Skip EMPTY and MSTAR lines.
+- Breakthru Beverage Illinois: Ext W/O Tax = line total. unitCost = Ext W/O Tax / Cases qty. Skip Service Fee lines.
 - Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name with pack descriptor","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
-3. qty = QTY column value as shown. unitCost = per-unit cost from invoice. total = line total.
-4. Categories: Spirits, Beer, Wine, Mixers, Other. Hard seltzers and canned cocktails = Beer.
+2. Each item: {"item":"product name with descriptor","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
+3. qty = QTY column. unitCost = D.Price for Lakeshore. total = unitCost x qty.
+4. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Hard seltzers and canned cocktails = Beer. Kegs = Keg.
 5. Every item must have the same invoiceNumber and invoiceDate from the header.
-6. Skip deposit lines, tax lines, service fees, $0 lines.
+6. Skip EMPTY deposit returns, tax lines, service fees, $0 lines.
 
 Return only the JSON array.`;
 
@@ -2463,7 +2472,7 @@ function renderBatchReview() {
           style="width:100%;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;"></td>
         <td><select onchange="batchResults[${ri}].items[${idx}].category=this.value;batchResults[${ri}].items[${idx}].cat=this.value"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:2px 4px;border-radius:3px;">
-          ${['Spirits','Beer','Wine','Mixers','Other'].map(c=>`<option${(c===item.category||c===item.cat)?' selected':''}>${c}</option>`).join('')}
+          ${['Spirits','Beer','Wine','Mixers','Keg','Other'].map(c=>`<option${(c===item.category||c===item.cat)?' selected':''}>${c}</option>`).join('')}
         </select></td>
         <td style="text-align:right;"><input type="number" value="${(item.cost||item.unitCost||0).toFixed(2)}"
           oninput="batchResults[${ri}].items[${idx}].cost=parseFloat(this.value)||0;batchResults[${ri}].items[${idx}].unitCost=parseFloat(this.value)||0"
@@ -2610,21 +2619,49 @@ function showInvoiceResults(items, source) {
     return itemName.replace(/\s*\d+\/\d+(?:\/\d+)?\s*(?:CAN|BTL|BT|ML|OZ|LT|PK)?/i, '').trim();
   }
 
+  // Detect keg descriptors
+  function isKegDescriptor(str) {
+    return /(1\/2\s*BBL|1\/4\s*BBL|1\/6\s*BBL|SLIM|BBL|KEG)/i.test(str || '');
+  }
+  function stripKegFromName(name) {
+    return (name || '').replace(/\s*(1\/[246]\s*BBL|SLIM|BBL|KEG)\s*/i, '').trim();
+  }
+
   // Normalize items: fix category, parse pack sizes client-side
   pendingInvoiceItems = items.map(function(i) {
-    var packStr = i.packSize || extractPackFromName(i.item) || '';
+    var itemName = i.item || '';
+    var isKeg = isKegDescriptor(itemName) || i.uom === 'KEG';
+
+    if (isKeg) {
+      // Keg: qty=1 per keg, unitCost=D.Price (no deposit), total=unitCost*qty
+      var qty = i.qty || 1;
+      var unitCost = i.unitCost || 0;
+      return Object.assign({}, i, {
+        category: 'Keg',
+        item: stripKegFromName(itemName),
+        qty: qty,
+        unitCost: unitCost,
+        total: parseFloat((unitCost * qty).toFixed(2)),
+        unitsPerPack: 1,
+        packSize: itemName.match(/1\/[246]\s*BBL|SLIM|BBL|KEG/i) ? itemName.match(/1\/[246]\s*BBL|SLIM|BBL|KEG/i)[0].trim() : 'Keg',
+        uom: 'KEG',
+        trackAs: 'unit'
+      });
+    }
+
+    var packStr = i.packSize || extractPackFromName(itemName) || '';
     var upc = packStr ? parsePackSize(packStr) : (i.unitsPerCase || i.unitsPerPack || 1);
     var qty = i.qty || 1;
     var total = i.total || ((i.unitCost||0) * qty);
     var unitCost = i.unitCost || 0;
-    // If upc > 1 and qty looks like a case count (small number), expand to individual units
+    // If upc > 1 and qty looks like a case count, expand to individual units
     if (upc > 1 && qty < upc) {
       qty = qty * upc;
       unitCost = parseFloat((total / qty).toFixed(4));
     }
     return Object.assign({}, i, {
       category: i.category || i.cat || 'Other',
-      item: stripPackFromName(i.item), // remove pack descriptor from display name
+      item: stripPackFromName(itemName),
       qty: qty,
       unitCost: unitCost,
       total: total,
@@ -2634,7 +2671,7 @@ function showInvoiceResults(items, source) {
       trackAs: 'unit'
     });
   });
-  const cats = ['Spirits','Beer','Wine','Mixers','Other'];
+  const cats = ['Spirits','Beer','Wine','Mixers','Keg','Other'];
 
   const buildRow = (i, idx) => {
     const isCse = i.uom==='CSE' && i.unitsPerPack>1;
