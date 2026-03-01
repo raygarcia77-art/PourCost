@@ -450,6 +450,7 @@ input::placeholder{color:var(--muted);}
     <div class="tab" onclick="switchTab('mapping')">Product Mapping</div>
     <div class="tab" onclick="switchTab('costing')">Menu Costing</div>
     <div class="tab" onclick="switchTab('history')">History</div>
+    <div class="tab" onclick="switchTab('submitlog')">Submission Log</div>
     <div class="tab" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -1049,6 +1050,23 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
+    <!-- ── SUBMISSION LOG ── -->
+    <div class="panel" id="panel-submitlog">
+      <div class="section-header">
+        <div class="section-title">SUBMISSION LOG — <span id="submitlog-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.8;">
+        A record of every POS drop, invoice import, and weekly entry. Click any row to expand details or re-import.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('all')" id="slog-filter-all">All</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('pos')" id="slog-filter-pos">POS Drops</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('invoice')" id="slog-filter-invoice">Invoices</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('weekly')" id="slog-filter-weekly">Weekly Entries</button>
+      </div>
+      <div id="submitlog-list"></div>
+    </div>
+
     <!-- ── SETTINGS ── -->
     <div class="panel" id="panel-settings">
       <div class="section-header"><div class="section-title">SETTINGS &amp; CONNECTION</div></div>
@@ -1233,7 +1251,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[] };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[] };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -1508,7 +1526,7 @@ function switchBar(barId) {
   const active = document.querySelector('.panel.active');
   if (active){
     const panelId = active.id.replace('panel-','');
-    if (isCombined && ['weekly','purchases','wastelog','depletion','par','prices','mapping','costing'].includes(panelId)) switchTab('dashboard');
+    if (isCombined && ['weekly','purchases','wastelog','depletion','par','prices','mapping','costing','submitlog'].includes(panelId)) switchTab('dashboard');
     else renderCurrentPanel();
   }
 }
@@ -1541,7 +1559,7 @@ function setSyncStatus(status, label) {
 // TABS
 // ══════════════════════════════════════════════
 function switchTab(name) {
-  const names=['dashboard','weekly','purchases','wastelog','depletion','par','prices','mapping','costing','history','settings'];
+  const names=['dashboard','weekly','purchases','wastelog','depletion','par','prices','mapping','costing','history','submitlog','settings'];
   document.querySelectorAll('.tabs .tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
@@ -1553,6 +1571,7 @@ function switchTab(name) {
   else if (name==='par') renderPar();
   else if (name==='prices') renderPrices();
   else if (name==='mapping') renderMapping();
+  else if (name==='submitlog') renderSubmitLog();
   else if (name==='costing') renderCosting();
   else if (name==='history') renderHistory();
   else if (name==='settings') renderSettings();
@@ -1653,6 +1672,17 @@ function addWeekEntry(){
   if(idx>=0){if(confirm('Overwrite this week?'))S().weeks[idx]=entry;else return;}
   else S().weeks.push(entry);
   S().weeks.sort((a,b)=>a.week.localeCompare(b.week));
+  // Log submission
+  if(!S().submissionLog) S().submissionLog=[];
+  S().submissionLog.unshift({
+    id: Date.now()+'',
+    type: 'weekly',
+    submittedAt: new Date().toISOString(),
+    bar: activeBar,
+    filename: null,
+    summary: 'Week of '+getWeekLabel(week)+' · Sales: '+fmt$(sales)+' · COGS: '+fmt$(cogs),
+    data: JSON.parse(JSON.stringify(entry))
+  });
   saveLocal();renderWeeklyTable();renderDashboard();
   showToast('✓ Week saved to '+BARS[activeBar].name);scheduleSync();
   ['entry-start','entry-purchases','entry-end','entry-sales','entry-notes',
@@ -2101,6 +2131,7 @@ let pendingInvoiceItems=[];
 let pendingInvoiceNumber=null;
 let pendingInvoiceDate=null;
 let pendingInvoiceVendor=null;
+let pendingInvoiceFilename=null;
 
 // Batch state
 let batchQueue = [];       // files waiting to process
@@ -2133,6 +2164,7 @@ async function handleInvoiceScan(input) {
 // ── Single file handler (unchanged behaviour) ──
 async function handleInvoiceFile(file) {
   if (activeBar==='combined') { showToast('Switch to a specific bar first',true); return; }
+  pendingInvoiceFilename = file.name;
   document.getElementById('scan-loading').style.display='block';
   document.getElementById('ai-result').classList.remove('show');
   document.getElementById('batch-review-panel').style.display='none';
@@ -2862,11 +2894,26 @@ function confirmInvoiceItems(){
       S().invoiceNumbers.push(pendingInvoiceNumber);
     }
   }
+  // Log submission
+  if(!S().submissionLog) S().submissionLog=[];
+  const invTotal = active.reduce((s,i)=>(s+(i.unitCost||0)*(i.qty||1)),0);
+  S().submissionLog.unshift({
+    id: Date.now()+'',
+    type: 'invoice',
+    submittedAt: new Date().toISOString(),
+    bar: activeBar,
+    filename: pendingInvoiceFilename||null,
+    summary: (pendingInvoiceVendor||'Invoice')+' · '+(pendingInvoiceNumber?'#'+pendingInvoiceNumber+' · ':'')+active.length+' items · '+fmt$(invTotal),
+    data: JSON.parse(JSON.stringify(active)),
+    invoiceNumber: pendingInvoiceNumber||null,
+    invoiceDate: date,
+    vendor: pendingInvoiceVendor||null
+  });
   saveLocal();renderPurchasesTable();renderPrices();renderRecentInvoices();clearScan();
   showToast(`✓ ${active.length} items added to ${BARS[activeBar].name} · dated ${date}`);
   scheduleSync();pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;pendingInvoiceVendor=null;
 }
-function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;pendingInvoiceVendor=null;}
+function clearScan(){document.getElementById('ai-result').classList.remove('show');document.getElementById('invoice-file').value='';pendingInvoiceItems=[];pendingInvoiceNumber=null;pendingInvoiceDate=null;pendingInvoiceVendor=null;pendingInvoiceFilename=null;}
 
 // ══════════════════════════════════════════════
 // CSV UPLOAD
@@ -2979,6 +3026,20 @@ function handlePOSUpload(input){
     }
     document.getElementById('upload-pos').classList.add('loaded');
     updatePreview();
+    // Log POS submission
+    if(!S().submissionLog) S().submissionLog=[];
+    const posResult = parseToastSalesCSV(text);
+    const posTotal = posResult ? posResult.total : 0;
+    S().submissionLog.unshift({
+      id: Date.now()+'',
+      type: 'pos',
+      submittedAt: new Date().toISOString(),
+      bar: activeBar,
+      filename: file.name,
+      summary: 'POS Drop · '+file.name+' · '+fmt$(posTotal)+' total sales',
+      data: text.slice(0, 50000) // store raw CSV (capped at 50kb)
+    });
+    saveLocal();
     // Extract items and check for unmatched
     const newItems=extractPosItems(text);
     if(newItems.length>0) openPosReviewModal(newItems);
@@ -3243,6 +3304,183 @@ function closePosReviewModal(){
 // ══════════════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// SUBMISSION LOG
+// ══════════════════════════════════════════════
+let submitLogFilter = 'all';
+
+function filterSubmitLog(type) {
+  submitLogFilter = type;
+  ['all','pos','invoice','weekly'].forEach(t => {
+    const btn = document.getElementById('slog-filter-'+t);
+    if (btn) btn.style.background = t===type ? 'rgba(212,168,67,0.15)' : '';
+    if (btn) btn.style.color = t===type ? 'var(--accent)' : '';
+    if (btn) btn.style.borderColor = t===type ? 'var(--accent)' : '';
+  });
+  renderSubmitLog();
+}
+
+function renderSubmitLog() {
+  const el = document.getElementById('submitlog-list');
+  if (!el) return;
+  const log = (S().submissionLog || []).filter(e => submitLogFilter==='all' || e.type===submitLogFilter);
+
+  if (!log.length) {
+    el.innerHTML = '<div class="empty-state">No submissions yet — POS drops, invoice imports, and weekly entries will appear here.</div>';
+    return;
+  }
+
+  const typeIcon = { pos: '🖥️', invoice: '📄', weekly: '📅' };
+  const typeLabel = { pos: 'POS Drop', invoice: 'Invoice Import', weekly: 'Weekly Entry' };
+  const typeColor = { pos: 'var(--green)', invoice: 'var(--accent)', weekly: '#9b6abf' };
+
+  el.innerHTML = log.map((entry, i) => {
+    const dt = new Date(entry.submittedAt);
+    const dateStr = dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    const timeStr = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    return `
+      <div style="border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);cursor:pointer;"
+          onclick="toggleSubmitLogEntry('sle-${i}')">
+          <div style="font-size:18px;">${typeIcon[entry.type]||'📋'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--mono);font-size:11px;color:${typeColor[entry.type]||'var(--accent)'};text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">${typeLabel[entry.type]||entry.type}</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(entry.summary||'')}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">${dateStr}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);opacity:0.6;">${timeStr}</div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-left:4px;">▼</div>
+        </div>
+        <div id="sle-${i}" style="display:none;padding:14px 16px;border-top:1px solid var(--border);">
+          ${renderSubmitLogDetail(entry, i)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleSubmitLogEntry(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function renderSubmitLogDetail(entry, i) {
+  let html = '';
+
+  if (entry.filename) {
+    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;">📎 ${escHtml(entry.filename)}</div>`;
+  }
+
+  if (entry.type === 'weekly' && entry.data) {
+    const d = entry.data;
+    html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
+      <div style="background:var(--surface);padding:10px;border-radius:4px;"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">START INV</div><div style="font-family:var(--display);font-size:16px;">${fmt$(d.start)}</div></div>
+      <div style="background:var(--surface);padding:10px;border-radius:4px;"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">PURCHASES</div><div style="font-family:var(--display);font-size:16px;">${fmt$(d.purchases)}</div></div>
+      <div style="background:var(--surface);padding:10px;border-radius:4px;"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">END INV</div><div style="font-family:var(--display);font-size:16px;">${fmt$(d.end)}</div></div>
+      <div style="background:var(--surface);padding:10px;border-radius:4px;"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">SALES</div><div style="font-family:var(--display);font-size:16px;">${fmt$(d.sales)}</div></div>
+    </div>`;
+    html += `<button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="resubmitWeeklyEntry(${i})">↩ Re-submit This Entry</button>`;
+  }
+
+  if (entry.type === 'invoice' && entry.data && entry.data.length) {
+    html += `<div style="overflow-x:auto;max-height:220px;overflow-y:auto;margin-bottom:12px;">
+      <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border);">Item</th>
+          <th style="padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border);">Cat</th>
+          <th style="text-align:right;padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border);">Qty</th>
+          <th style="text-align:right;padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border);">Unit Cost</th>
+          <th style="text-align:right;padding:4px 8px;color:var(--muted);border-bottom:1px solid var(--border);">Total</th>
+        </tr></thead>
+        <tbody>
+          ${entry.data.map(it=>`<tr>
+            <td style="padding:3px 8px;color:var(--text);">${escHtml(it.item||'')}</td>
+            <td style="padding:3px 8px;color:var(--muted);">${escHtml(it.cat||it.category||'')}</td>
+            <td style="padding:3px 8px;text-align:right;">${it.qty||''}</td>
+            <td style="padding:3px 8px;text-align:right;">${fmt$(it.unitCost||it.cost||0)}</td>
+            <td style="padding:3px 8px;text-align:right;">${fmt$((it.unitCost||it.cost||0)*(it.qty||1))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+    html += `<button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="resubmitInvoiceEntry(${i})">↩ Re-import This Invoice</button>`;
+  }
+
+  if (entry.type === 'pos') {
+    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;">Raw CSV data saved. Re-drop the original file to re-process.</div>`;
+    if (entry.data) {
+      html += `<button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="resubmitPOSEntry(${i})">↩ Re-process This POS Drop</button>`;
+    }
+  }
+
+  html += `<button class="btn btn-danger" style="font-size:11px;padding:5px 14px;margin-left:8px;" onclick="deleteSubmitLogEntry(${i})">🗑 Delete from Log</button>`;
+  return html;
+}
+
+function resubmitWeeklyEntry(i) {
+  const log = S().submissionLog || [];
+  const entry = log.filter(e => submitLogFilter==='all' || e.type===submitLogFilter)[i];
+  if (!entry || !entry.data) return;
+  const d = entry.data;
+  document.getElementById('entry-week').value = d.week||'';
+  document.getElementById('entry-start').value = d.start||'';
+  document.getElementById('entry-purchases').value = d.purchases||'';
+  document.getElementById('entry-end').value = d.end||'';
+  document.getElementById('entry-sales').value = d.sales||'';
+  document.getElementById('entry-notes').value = d.notes||'';
+  if(d.salesSpirits) document.getElementById('entry-sales-spirits').value = d.salesSpirits;
+  if(d.salesBeer) document.getElementById('entry-sales-beer').value = d.salesBeer;
+  if(d.salesWine) document.getElementById('entry-sales-wine').value = d.salesWine;
+  if(d.salesMixers) document.getElementById('entry-sales-mixers').value = d.salesMixers;
+  switchTab('weekly');
+  showToast('✓ Weekly entry loaded — edit and re-save');
+}
+
+function resubmitInvoiceEntry(i) {
+  const log = S().submissionLog || [];
+  const entry = log.filter(e => submitLogFilter==='all' || e.type===submitLogFilter)[i];
+  if (!entry || !entry.data) return;
+  pendingInvoiceItems = entry.data.map(it => ({...it, category: it.cat||it.category||'Other'}));
+  pendingInvoiceNumber = entry.invoiceNumber||null;
+  pendingInvoiceDate = entry.invoiceDate||null;
+  pendingInvoiceVendor = entry.vendor||null;
+  pendingInvoiceFilename = entry.filename||null;
+  switchTab('purchases');
+  showInvoiceResults(pendingInvoiceItems, 'Re-import from log');
+  showToast('✓ Invoice loaded for review — confirm to re-import');
+}
+
+function resubmitPOSEntry(i) {
+  const log = S().submissionLog || [];
+  const entry = log.filter(e => submitLogFilter==='all' || e.type===submitLogFilter)[i];
+  if (!entry || !entry.data) return;
+  // Re-process the saved CSV text
+  const result = parseToastSalesCSV(entry.data);
+  if (result) {
+    document.getElementById('entry-sales').value = result.total.toFixed(2);
+    if(result.spirits) document.getElementById('entry-sales-spirits').value = result.spirits.toFixed(2);
+    if(result.beer) document.getElementById('entry-sales-beer').value = result.beer.toFixed(2);
+    if(result.wine) document.getElementById('entry-sales-wine').value = result.wine.toFixed(2);
+    if(result.mixers) document.getElementById('entry-sales-mixers').value = result.mixers.toFixed(2);
+  }
+  switchTab('weekly');
+  showToast('✓ POS data re-loaded into Weekly Entry');
+}
+
+function deleteSubmitLogEntry(i) {
+  if (!confirm('Remove this entry from the log?')) return;
+  const filtered = (S().submissionLog || []).filter(e => submitLogFilter==='all' || e.type===submitLogFilter);
+  const entry = filtered[i];
+  if (!entry) return;
+  S().submissionLog = (S().submissionLog||[]).filter(e => e.id !== entry.id);
+  saveLocal();
+  renderSubmitLog();
+  showToast('Entry removed from log');
+}
+
 async function saveSettings(){
   const url=(document.getElementById('settings-script-url').value||'').trim();
   if(url) config.scriptUrl=url;
