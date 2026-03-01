@@ -450,7 +450,6 @@ input::placeholder{color:var(--muted);}
     <div class="tab" onclick="switchTab('mapping')">Product Mapping</div>
     <div class="tab" onclick="switchTab('costing')">Menu Costing</div>
     <div class="tab" onclick="switchTab('history')">History</div>
-    <div class="tab" onclick="switchTab('submitlog')">Submission Log</div>
     <div class="tab" onclick="switchTab('settings')">Settings</div>
   </div>
 
@@ -622,6 +621,23 @@ input::placeholder{color:var(--muted);}
       <div class="table-wrap">
         <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th><th>Sync</th><th></th></tr></thead>
         <tbody id="weekly-table-body"><tr><td colspan="10" class="empty-state">No entries yet</td></tr></tbody></table>
+      </div>
+
+      <!-- Submission Log collapsible -->
+      <div class="section-header" style="margin-top:24px;">
+        <div class="section-title collapsible" onclick="secToggle(this,'sb-submitlog');renderSubmitLog();">SUBMISSION LOG</div>
+      </div>
+      <div id="sb-submitlog" style="display:none;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.8;">
+          Every POS drop, invoice import, and weekly entry is saved here. Click any row to expand or re-submit.
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="filterSubmitLog('all')" id="slog-filter-all">All</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="filterSubmitLog('pos')" id="slog-filter-pos">POS Drops</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="filterSubmitLog('invoice')" id="slog-filter-invoice">Invoices</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="filterSubmitLog('weekly')" id="slog-filter-weekly">Weekly Entries</button>
+        </div>
+        <div id="submitlog-list"></div>
       </div>
     </div>
 
@@ -1050,22 +1066,6 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
-    <!-- ── SUBMISSION LOG ── -->
-    <div class="panel" id="panel-submitlog">
-      <div class="section-header">
-        <div class="section-title">SUBMISSION LOG — <span id="submitlog-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
-      </div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.8;">
-        A record of every POS drop, invoice import, and weekly entry. Click any row to expand details or re-import.
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('all')" id="slog-filter-all">All</button>
-        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('pos')" id="slog-filter-pos">POS Drops</button>
-        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('invoice')" id="slog-filter-invoice">Invoices</button>
-        <button class="btn btn-outline" style="font-size:11px;padding:5px 14px;" onclick="filterSubmitLog('weekly')" id="slog-filter-weekly">Weekly Entries</button>
-      </div>
-      <div id="submitlog-list"></div>
-    </div>
 
     <!-- ── SETTINGS ── -->
     <div class="panel" id="panel-settings">
@@ -1526,7 +1526,7 @@ function switchBar(barId) {
   const active = document.querySelector('.panel.active');
   if (active){
     const panelId = active.id.replace('panel-','');
-    if (isCombined && ['weekly','purchases','wastelog','depletion','par','prices','mapping','costing','submitlog'].includes(panelId)) switchTab('dashboard');
+    if (isCombined && ['weekly','purchases','wastelog','depletion','par','prices','mapping','costing'].includes(panelId)) switchTab('dashboard');
     else renderCurrentPanel();
   }
 }
@@ -1559,7 +1559,7 @@ function setSyncStatus(status, label) {
 // TABS
 // ══════════════════════════════════════════════
 function switchTab(name) {
-  const names=['dashboard','weekly','purchases','wastelog','depletion','par','prices','mapping','costing','history','submitlog','settings'];
+  const names=['dashboard','weekly','purchases','wastelog','depletion','par','prices','mapping','costing','history','settings'];
   document.querySelectorAll('.tabs .tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
@@ -1571,7 +1571,6 @@ function switchTab(name) {
   else if (name==='par') renderPar();
   else if (name==='prices') renderPrices();
   else if (name==='mapping') renderMapping();
-  else if (name==='submitlog') renderSubmitLog();
   else if (name==='costing') renderCosting();
   else if (name==='history') renderHistory();
   else if (name==='settings') renderSettings();
