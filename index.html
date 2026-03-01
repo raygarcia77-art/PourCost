@@ -1313,12 +1313,16 @@ function updateSetupUI() {
 }
 async function finishSetup() {
   const url = (document.getElementById('setup-script-url')?.value||'').trim() || config.scriptUrl;
-  if (!url||!url.includes('script.google.com')){alert('Please paste your Apps Script Web App URL.');return;}
-  config.scriptUrl=url; saveConfig();
+  // If no URL entered and none saved, just go offline rather than blocking
+  if (url && url.includes('script.google.com')) {
+    config.scriptUrl = url;
+    saveConfig();
+  }
   localStorage.setItem('pourcost_setup_done','1');
   document.getElementById('setup-overlay').style.display='none';
   document.getElementById('app').style.display='block';
-  await initSheets(); initApp();
+  if (config.scriptUrl) { await initSheets().catch(()=>{}); }
+  initApp();
 }
 function skipSetup() {
   localStorage.setItem('pourcost_setup_done','offline');
@@ -5098,11 +5102,13 @@ function initApp(){
 async function main(){
   loadLocal();
   const done=localStorage.getItem('pourcost_setup_done');
-  if(done){
+  // If setup was done before OR config has a script URL already saved, skip setup
+  if(done || config.scriptUrl){
     document.getElementById('setup-overlay').style.display='none';
     document.getElementById('app').style.display='block';
     if(done==='offline'){setSyncStatus('offline','Offline mode');}
     else if(config.scriptUrl){setSyncStatus('pending','Connecting...');await pullFromSheets().catch(()=>{});}
+    if(!done) localStorage.setItem('pourcost_setup_done','1');
     initApp();
   }
 }
