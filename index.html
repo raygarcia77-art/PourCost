@@ -36,13 +36,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 
 /* ── BAR SWITCHER ── */
 #bar-switcher{background:#0a0a0a;border-bottom:2px solid var(--border);display:flex;align-items:stretch;}
-.bar-btn{flex:1;padding:12px 24px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;transition:all 0.2s;border-bottom:3px solid transparent;position:relative;}
+.bar-btn{flex:1;padding:16px 24px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;border:none;background:none;transition:all 0.2s;border-bottom:3px solid transparent;position:relative;}
 .bar-btn:hover{background:rgba(255,255,255,0.03);}
 .bar-btn.active-dh{border-bottom-color:#c0841a;background:rgba(192,132,26,0.08);}
 .bar-btn.active-lh{border-bottom-color:#7b4ea0;background:rgba(123,78,160,0.08);}
-.bar-btn-name{font-family:var(--display);font-size:18px;letter-spacing:3px;color:var(--muted);transition:color 0.2s;}
-.bar-btn.active-dh .bar-btn-name{color:#c0841a;}
-.bar-btn.active-lh .bar-btn-name{color:#9b6abf;}
+.bar-btn-name{font-family:var(--display);font-size:26px;letter-spacing:4px;color:var(--muted);transition:color 0.2s;text-shadow:0 0 20px transparent;}
+.bar-btn.active-dh .bar-btn-name{color:#c0841a;text-shadow:0 0 24px rgba(192,132,26,0.5);}
+.bar-btn.active-lh .bar-btn-name{color:#9b6abf;text-shadow:0 0 24px rgba(155,106,191,0.5);}
 .bar-btn-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
 .bar-divider{width:1px;background:var(--border);margin:10px 0;}
 .bar-combined-btn{padding:12px 28px;display:flex;align-items:center;gap:8px;cursor:pointer;border:none;background:none;color:var(--muted);font-family:var(--mono);font-size:11px;transition:all 0.2s;border-bottom:3px solid transparent;}
@@ -2455,34 +2455,56 @@ function showInvoiceResults(items, source) {
     </tr>`;
   };
 
+  // Group items by vendor + invoiceNumber
+  const groups = [];
+  const groupMap = {};
+  items.forEach((item, idx) => {
+    const key = (item.vendor||'Unknown Vendor') + '||' + (item.invoiceNumber||'');
+    if (!groupMap[key]) {
+      groupMap[key] = { vendor: item.vendor||'Unknown Vendor', invoiceNumber: item.invoiceNumber||'', invoiceDate: item.invoiceDate||'', indices: [] };
+      groups.push(groupMap[key]);
+    }
+    groupMap[key].indices.push(idx);
+  });
+
+  const tableHeaders = `<thead><tr>
+    <th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">ITEM NAME</th>
+    <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">CATEGORY</th>
+    <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">UNIT COST</th>
+    <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">QTY</th>
+    <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">TOTAL</th>
+    <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);text-align:center;">TRACK AS</th>
+    <th style="padding:5px;"></th>
+  </tr></thead>`;
+
+  const groupsHTML = groups.map(g => {
+    const groupTotal = g.indices.reduce((sum,idx) => sum + (items[idx].unitCost * items[idx].qty), 0);
+    return `
+      <div style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:16px;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px 6px 0 0;border-bottom:2px solid var(--accent);">
+          <div>
+            <div style="font-family:var(--display);font-size:15px;letter-spacing:2px;color:var(--accent);">${escHtml(g.vendor)}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;">
+              ${g.invoiceNumber ? 'Invoice #'+escHtml(g.invoiceNumber) : 'No invoice #'} 
+              ${g.invoiceDate ? ' · '+escHtml(g.invoiceDate) : ''}
+              · ${g.indices.length} items · ${fmt$(groupTotal)}
+            </div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;">
+          <table style="width:100%;border-collapse:collapse;">
+            ${tableHeaders}
+            <tbody>${g.indices.map(idx => buildRow(items[idx], idx)).join('')}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
   document.getElementById('ai-result-content').innerHTML=`
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">
-        ✓ ${source} — ${items.length} items found · <span style="color:var(--accent)">Edit any field · toggle btl/case for cases</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-        <label style="font-family:var(--mono);font-size:10px;color:var(--muted);">VENDOR:</label>
-        <input type="text" id="invoice-vendor-field" value="${escHtml(pendingInvoiceVendor||'')}" placeholder="e.g. Breakthru Beverage"
-          style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:4px 8px;border-radius:3px;font-size:12px;font-family:var(--mono);width:180px;"
-          oninput="pendingInvoiceVendor=this.value">
-      </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:16px;">
+      ✓ ${source} — ${items.length} items across ${groups.length} invoice${groups.length!==1?'s':''} · <span style="color:var(--accent)">Edit any field below</span>
     </div>
-    <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;" id="invoice-edit-table">
-      <thead><tr>
-        <th style="text-align:left;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">ITEM NAME</th>
-        <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">CATEGORY</th>
-        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">UNIT COST</th>
-        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">QTY</th>
-        <th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);">TOTAL</th>
-        <th style="padding:5px 8px;color:var(--muted);font-size:10px;font-family:var(--mono);text-align:center;">TRACK AS</th>
-        <th style="padding:5px;"></th>
-      </tr></thead>
-      <tbody id="invoice-edit-tbody">
-      ${items.map((i,idx)=>buildRow(i,idx)).join('')}
-      </tbody>
-    </table>
-    </div>`;
+    ${groupsHTML}`;
   document.getElementById('ai-result').classList.add('show');
 }
 
