@@ -1928,7 +1928,8 @@ function renderPrices(){
   const keys=Object.keys(st.priceHistory);
   if(!keys.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Add purchases to track price history</td></tr>';return;}
   tbody.innerHTML=keys.map(k=>{
-    const ph=st.priceHistory[k],hist=ph.history;
+    const ph=st.priceHistory[k],hist=(ph.history||[]).filter(h=>h&&h.cost!=null);
+    if(!hist.length) return '';
     const current=hist[hist.length-1].cost;
     const prev=hist.length>1?hist[hist.length-2].cost:null;
     const first=hist[0].cost;
@@ -2353,8 +2354,8 @@ async function handleInvoiceFile(file) {
     // Run duplicate check before showing results
     if (pendingInvoiceNumber && checkDuplicateInvoice(pendingInvoiceNumber)) return;
     showInvoiceResults(items, 'AI scanned' + (pendingInvoiceNumber ? ' · Invoice #'+pendingInvoiceNumber : ''));
-    // DEBUG — remove after confirming pack size works
-    if (items.length) showToast('DEBUG item[0]: ' + JSON.stringify({item: items[0].item, qty: items[0].qty, packSize: items[0].packSize}).substring(0,120), false);
+    // DEBUG
+    console.log('=== AI RAW ITEMS ===', JSON.stringify(items, null, 2));
   } catch(e) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
