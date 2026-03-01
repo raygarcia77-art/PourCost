@@ -2632,6 +2632,7 @@ function showInvoiceResults(items, source) {
   pendingInvoiceItems = items.map(function(i) {
     var itemName = i.item || '';
     var isKeg = isKegDescriptor(itemName) || i.uom === 'KEG';
+    console.log('NORMALIZE:', JSON.stringify(itemName), 'isKeg:', isKeg);
 
     if (isKeg) {
       // Keg: qty=1 per keg, unitCost=D.Price (no deposit), total=unitCost*qty
