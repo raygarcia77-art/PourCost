@@ -533,9 +533,24 @@ input::placeholder{color:var(--muted);}
         <input type="week" id="week-picker" style="width:auto" onchange="updateWeekLabel();autoFillPurchases()">
       </div>
       <div class="upload-grid">
-        <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="start-status"></div></div>
-        <div class="upload-box" id="upload-end"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'end')"><div class="upload-icon">📋</div><div class="upload-title">End of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="end-status"></div></div>
-        <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel — drop to preview</div><div class="upload-status" id="pos-status"></div></div>
+        <div>
+          <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="start-status"></div></div>
+          <button class="btn btn-primary" id="submit-start-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitInventory('start')">✓ Submit Start Inventory</button>
+        </div>
+        <div>
+          <div class="upload-box" id="upload-end"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'end')"><div class="upload-icon">📋</div><div class="upload-title">End of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="end-status"></div></div>
+          <button class="btn btn-primary" id="submit-end-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitInventory('end')">✓ Submit End Inventory</button>
+        </div>
+        <div>
+          <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="pos-status"></div></div>
+          <div id="pos-staged-preview" style="display:none;background:var(--surface);border:1px solid rgba(212,168,67,0.3);border-radius:0 0 6px 6px;padding:10px 12px;margin-top:-2px;font-family:var(--mono);font-size:11px;">
+            <div id="pos-staged-content" style="color:var(--muted);margin-bottom:8px;line-height:1.8;"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" style="flex:1;padding:7px;" onclick="applyPOSStaged()">✓ Submit POS Data</button>
+              <button class="btn btn-outline" style="padding:7px 14px;" onclick="cancelPOSStaged()">✕</button>
+            </div>
+          </div>
+        </div>
       </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title collapsible" onclick="secToggle(this,'sb-weekly-form')">MANUAL ENTRY</div></div>
@@ -547,15 +562,7 @@ input::placeholder{color:var(--muted);}
         <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;" id="pos-date-range-sub">Run your POS report for this exact date range to match this inventory period</div>
       </div>
 
-      <!-- POS Staged Preview — shown after file drop, before applying -->
-      <div id="pos-staged-preview" style="display:none;background:var(--surface);border:1px solid rgba(212,168,67,0.4);border-radius:6px;padding:16px 18px;margin-bottom:16px;">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">🖥️ POS FILE PREVIEW — REVIEW BEFORE APPLYING</div>
-        <div id="pos-staged-content" style="font-family:var(--mono);font-size:12px;color:var(--text);line-height:2;margin-bottom:14px;"></div>
-        <div style="display:flex;gap:10px;">
-          <button class="btn btn-primary" style="padding:8px 24px;" onclick="applyPOSStaged()">✓ APPLY TO ENTRY</button>
-          <button class="btn btn-outline" style="padding:8px 18px;" onclick="cancelPOSStaged()">✕ Cancel</button>
-        </div>
-      </div>
+
 
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:10px;">
         <div class="form-group"><label>Week</label><input type="week" id="entry-week"></div>
@@ -626,12 +633,6 @@ input::placeholder{color:var(--muted);}
           <div><div class="stat-label">Formula</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">Start + Purchases − End = COGS</div></div>
           <div><div class="stat-label">Target</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">18–24% spirits<br>24–30% overall avg</div></div>
         </div>
-      </div>
-      <!-- Submit Week Button -->
-      <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
-        <button class="btn btn-primary" style="font-size:14px;padding:12px 32px;letter-spacing:2px;" onclick="confirmWeekSubmit()">
-          ✓ SUBMIT WEEK ENTRY
-        </button>
       </div>
       </div><!-- /sb-weekly-form -->
       <div class="table-wrap">
@@ -3186,10 +3187,52 @@ function handleInventoryUpload(input,type){
   reader.onload=(e)=>{
     const lines=e.target.result.split('\n').filter(l=>l.trim());let sum=0;
     lines.slice(1).forEach(line=>{const parts=line.split(',');if(parts.length>=2){const last=parseFloat(parts[parts.length-1].replace(/[$,]/g,''));if(!isNaN(last)&&last>0&&last<100000)sum+=last;}});
-    if(type==='start'){document.getElementById('entry-start').value=sum.toFixed(2);document.getElementById('start-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;document.getElementById('upload-start').classList.add('loaded');}
-    else{document.getElementById('entry-end').value=sum.toFixed(2);document.getElementById('end-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;document.getElementById('upload-end').classList.add('loaded');}
+    if(type==='start'){
+      document.getElementById('entry-start').value=sum.toFixed(2);
+      document.getElementById('start-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
+      document.getElementById('upload-start').classList.add('loaded');
+      document.getElementById('submit-start-btn').style.display='block';
+      window._stagedStart = { sum, lines: lines.length-1, filename: input.files[0]?.name };
+    } else {
+      document.getElementById('entry-end').value=sum.toFixed(2);
+      document.getElementById('end-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
+      document.getElementById('upload-end').classList.add('loaded');
+      document.getElementById('submit-end-btn').style.display='block';
+      window._stagedEnd = { sum, lines: lines.length-1, filename: input.files[0]?.name };
+    }
     updatePreview();
   };reader.readAsText(file);
+}
+
+function submitInventory(type) {
+  const staged = type==='start' ? window._stagedStart : window._stagedEnd;
+  if (!staged) return;
+  const label = type==='start' ? 'Start' : 'End';
+  if (!confirm(`Submit ${label} Inventory?
+
+${fmt$(staged.sum)} total from ${staged.lines} items
+File: ${staged.filename}
+
+This will be saved to this week's entry.`)) return;
+
+  // Log to submission log
+  if(!S().submissionLog) S().submissionLog=[];
+  S().submissionLog.unshift({
+    id: Date.now()+'',
+    type: 'inventory',
+    submittedAt: new Date().toISOString(),
+    bar: activeBar,
+    filename: staged.filename,
+    summary: label+' Inventory · '+staged.filename+' · '+fmt$(staged.sum)+' · '+staged.lines+' items',
+    data: { type, sum: staged.sum, lines: staged.lines }
+  });
+  saveLocal();
+
+  // Hide button, show confirmed state
+  document.getElementById('submit-'+type+'-btn').style.display='none';
+  document.getElementById(type==='start'?'start-status':'end-status').textContent += ' ✓ Submitted';
+  window['_staged'+type.charAt(0).toUpperCase()+type.slice(1)] = null;
+  showToast('✓ '+label+' inventory submitted');
 }
 function handlePOSUpload(input){
   const file=input.files[0];if(!file)return;
