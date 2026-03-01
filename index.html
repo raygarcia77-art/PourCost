@@ -535,7 +535,7 @@ input::placeholder{color:var(--muted);}
       <div class="upload-grid">
         <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="start-status"></div></div>
         <div class="upload-box" id="upload-end"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'end')"><div class="upload-icon">📋</div><div class="upload-title">End of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="end-status"></div></div>
-        <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="pos-status"></div></div>
+        <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel — drop to preview</div><div class="upload-status" id="pos-status"></div></div>
       </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title collapsible" onclick="secToggle(this,'sb-weekly-form')">MANUAL ENTRY</div></div>
@@ -545,6 +545,16 @@ input::placeholder{color:var(--muted);}
         <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">📅 POS REPORT DATE RANGE</div>
         <div style="font-family:var(--display);font-size:18px;letter-spacing:1px;" id="pos-date-range-text">—</div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;" id="pos-date-range-sub">Run your POS report for this exact date range to match this inventory period</div>
+      </div>
+
+      <!-- POS Staged Preview — shown after file drop, before applying -->
+      <div id="pos-staged-preview" style="display:none;background:var(--surface);border:1px solid rgba(212,168,67,0.4);border-radius:6px;padding:16px 18px;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">🖥️ POS FILE PREVIEW — REVIEW BEFORE APPLYING</div>
+        <div id="pos-staged-content" style="font-family:var(--mono);font-size:12px;color:var(--text);line-height:2;margin-bottom:14px;"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" style="padding:8px 24px;" onclick="applyPOSStaged()">✓ APPLY TO ENTRY</button>
+          <button class="btn btn-outline" style="padding:8px 18px;" onclick="cancelPOSStaged()">✕ Cancel</button>
+        </div>
       </div>
 
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:10px;">
@@ -566,7 +576,7 @@ input::placeholder{color:var(--muted);}
         <div class="form-group"><label>Total Bar Sales $</label><input type="number" id="entry-sales" placeholder="0.00" step="0.01" oninput="updatePreview()"></div>
         <div class="form-group"><label>Notes</label><input type="text" id="entry-notes" placeholder="Optional"></div>
         <div></div>
-        <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addWeekEntry()">+ ADD</button></div>
+        <div class="form-group"><label>&nbsp;</label></div>
       </div>
 
       <!-- Category Sales Breakdown (auto-filled from POS upload) -->
@@ -616,6 +626,12 @@ input::placeholder{color:var(--muted);}
           <div><div class="stat-label">Formula</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">Start + Purchases − End = COGS</div></div>
           <div><div class="stat-label">Target</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">18–24% spirits<br>24–30% overall avg</div></div>
         </div>
+      </div>
+      <!-- Submit Week Button -->
+      <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
+        <button class="btn btn-primary" style="font-size:14px;padding:12px 32px;letter-spacing:2px;" onclick="confirmWeekSubmit()">
+          ✓ SUBMIT WEEK ENTRY
+        </button>
       </div>
       </div><!-- /sb-weekly-form -->
       <div class="table-wrap">
@@ -1647,6 +1663,120 @@ function updatePreview(){
   const cogs=s+p-e,pct=sales>0?(cogs/sales)*100:0;
   const prev=document.getElementById('weekly-calc-preview');
   if(s||p||e||sales){prev.style.display='block';document.getElementById('preview-cogs-dollar').textContent=fmt$(cogs);const pe=document.getElementById('preview-cogs-pct');pe.textContent=fmtPct(pct);pe.className='stat-value '+cogsClass(pct);}
+}
+
+function applyPOSStaged() {
+  const staged = window._posStaged;
+  if (!staged) return;
+  const { text, file, result, stagedTotal, startDate, endDate } = staged;
+
+  if (result) {
+    document.getElementById('entry-sales').value = result.total.toFixed(2);
+    document.getElementById('entry-sales-spirits').value = result.spirits>0 ? result.spirits.toFixed(2) : '';
+    document.getElementById('entry-sales-beer').value    = result.beer>0    ? result.beer.toFixed(2)    : '';
+    document.getElementById('entry-sales-wine').value    = result.wine>0    ? result.wine.toFixed(2)    : '';
+    document.getElementById('entry-sales-mixers').value  = result.mixers>0  ? result.mixers.toFixed(2)  : '';
+    const hintEl = document.getElementById('cat-sales-hint');
+    if (hintEl) {
+      const parts = [];
+      if (result.spirits) parts.push('Spirits ' + fmt$(result.spirits));
+      if (result.beer)    parts.push('Beer ' + fmt$(result.beer));
+      if (result.wine)    parts.push('Wine ' + fmt$(result.wine));
+      if (result.mixers)  parts.push('Mixers ' + fmt$(result.mixers));
+      if (result.food)    parts.push('Food ' + fmt$(result.food) + ' (excluded)');
+      hintEl.textContent = '✓ Applied: ' + parts.join(' · ');
+    }
+  } else {
+    // Fallback
+    const lines = text.split('\n').filter(l=>l.trim());
+    let colSums = {};
+    lines.slice(1).forEach(line=>{line.split(',').forEach((v,i)=>{const n=parseFloat(v.replace(/[$,]/g,''));if(!isNaN(n)&&n>0)colSums[i]=(colSums[i]||0)+n;});});
+    const maxCol = Object.values(colSums).length ? Math.max(...Object.values(colSums)) : 0;
+    document.getElementById('entry-sales').value = maxCol.toFixed(2);
+  }
+
+  // Auto-fill date fields from filename if not already set
+  if (startDate) {
+    const startEl = document.getElementById('entry-start-date');
+    const endEl   = document.getElementById('entry-end-date');
+    if (startEl && !startEl.value) startEl.value = startDate + 'T00:00';
+    if (endEl && endDate && !endEl.value) endEl.value = endDate + 'T23:59';
+    updatePosDateBanner();
+  }
+
+  updatePreview();
+
+  // Log POS submission
+  if (!S().submissionLog) S().submissionLog = [];
+  S().submissionLog.unshift({
+    id: Date.now()+'',
+    type: 'pos',
+    submittedAt: new Date().toISOString(),
+    bar: activeBar,
+    filename: file,
+    summary: 'POS Drop · ' + file + ' · ' + fmt$(stagedTotal) + ' total sales' + (startDate ? ' · ' + startDate + (endDate ? ' → ' + endDate : '') : ''),
+    data: text.slice(0, 50000)
+  });
+  saveLocal();
+
+  // Hide staged preview
+  document.getElementById('pos-staged-preview').style.display = 'none';
+  document.getElementById('pos-status').textContent = '✓ ' + fmt$(stagedTotal) + ' applied';
+  window._posStaged = null;
+  showToast('✓ POS data applied — review above then Submit Week');
+
+  // Extract items and check for unmatched
+  const newItems = extractPosItems(text);
+  if (newItems.length > 0) openPosReviewModal(newItems);
+}
+
+function cancelPOSStaged() {
+  window._posStaged = null;
+  document.getElementById('pos-staged-preview').style.display = 'none';
+  document.getElementById('upload-pos').classList.remove('loaded');
+  document.getElementById('pos-status').textContent = '';
+  document.getElementById('invoice-file') && (document.getElementById('invoice-file').value = '');
+  showToast('POS file cancelled');
+}
+
+function confirmWeekSubmit() {
+  const week = document.getElementById('entry-week').value;
+  const start = parseFloat(document.getElementById('entry-start').value)||0;
+  const purchases = parseFloat(document.getElementById('entry-purchases').value)||0;
+  const end = parseFloat(document.getElementById('entry-end').value)||0;
+  const sales = parseFloat(document.getElementById('entry-sales').value)||0;
+  const startDate = document.getElementById('entry-start-date').value||'';
+  const endDate = document.getElementById('entry-end-date').value||'';
+
+  if (!week) { alert('Please select a week first.'); return; }
+  if (!sales) { alert('Please enter total sales before submitting.'); return; }
+
+  const cogs = start + purchases - end;
+  const pct = sales > 0 ? (cogs/sales)*100 : 0;
+
+  // Build confirmation summary
+  const lines = [
+    '📅  Week: ' + getWeekLabel(week),
+    '',
+    '  Start Inventory:  ' + fmt$(start),
+    '  + Purchases:      ' + fmt$(purchases),
+    '  − End Inventory:  ' + fmt$(end),
+    '  ─────────────────────',
+    '  COGS:             ' + fmt$(cogs) + '  (' + pct.toFixed(1) + '%)',
+    '  Total Sales:      ' + fmt$(sales),
+    '',
+    startDate ? '  Period Start: ' + startDate.replace('T',' ') : '',
+    endDate   ? '  Period End:   ' + endDate.replace('T',' ') : '',
+  ].filter(l => l !== undefined && !(l==='' && !startDate && !endDate)).join('
+');
+
+  if (confirm('CONFIRM WEEK SUBMISSION
+
+' + lines + '
+
+Submit this entry?')) {
+    addWeekEntry();
+  }
 }
 
 function addWeekEntry(){
@@ -3093,53 +3223,33 @@ function handlePOSUpload(input){
   const reader=new FileReader();
   reader.onload=(e)=>{
     const text=e.target.result;
-    const result = parseToastSalesCSV(text);
-    if(result){
-      // Category-aware parse succeeded
-      document.getElementById('entry-sales').value=result.total.toFixed(2);
-      document.getElementById('entry-sales-spirits').value=result.spirits>0?result.spirits.toFixed(2):'';
-      document.getElementById('entry-sales-beer').value=result.beer>0?result.beer.toFixed(2):'';
-      document.getElementById('entry-sales-wine').value=result.wine>0?result.wine.toFixed(2):'';
-      document.getElementById('entry-sales-mixers').value=result.mixers>0?result.mixers.toFixed(2):'';
-      document.getElementById('pos-status').textContent=`✓ ${fmt$(result.total)} bar sales`;
-      const hintEl=document.getElementById('cat-sales-hint');
-      if(hintEl){
-        const parts=[];
-        if(result.spirits) parts.push(`Spirits ${fmt$(result.spirits)}`);
-        if(result.beer) parts.push(`Beer ${fmt$(result.beer)}`);
-        if(result.wine) parts.push(`Wine ${fmt$(result.wine)}`);
-        if(result.mixers) parts.push(`Mixers ${fmt$(result.mixers)}`);
-        if(result.food) parts.push(`Food ${fmt$(result.food)} (excluded)`);
-        hintEl.textContent='✓ Parsed: '+parts.join(' · ');
-      }
-    } else {
-      // Fallback: sum largest numeric column
-      const lines=text.split('\n').filter(l=>l.trim());
-      let colSums={};
-      lines.slice(1).forEach(line=>{line.split(',').forEach((v,i)=>{const n=parseFloat(v.replace(/[$,]/g,''));if(!isNaN(n)&&n>0)colSums[i]=(colSums[i]||0)+n;});});
-      const maxCol=Object.values(colSums).length?Math.max(...Object.values(colSums)):0;
-      document.getElementById('entry-sales').value=maxCol.toFixed(2);
-      document.getElementById('pos-status').textContent=`✓ ${fmt$(maxCol)} total sales`;
+    // Stage the data — show preview, don't apply yet
+    const posResultStaged = parseToastSalesCSV(text);
+    const stagedTotal = posResultStaged ? posResultStaged.total : 0;
+
+    // Store staged data for apply step
+    window._posStaged = {
+      text, file: file.name, result: posResultStaged, stagedTotal, startDate, endDate
+    };
+
+    // Build preview
+    const parts = [];
+    if (posResultStaged) {
+      if (posResultStaged.spirits) parts.push('Spirits: ' + fmt$(posResultStaged.spirits));
+      if (posResultStaged.beer)    parts.push('Beer: ' + fmt$(posResultStaged.beer));
+      if (posResultStaged.wine)    parts.push('Wine: ' + fmt$(posResultStaged.wine));
+      if (posResultStaged.mixers)  parts.push('Mixers: ' + fmt$(posResultStaged.mixers));
+      if (posResultStaged.food)    parts.push('Food (excluded): ' + fmt$(posResultStaged.food));
     }
+    const rangeStr = startDate ? (endDate ? startDate + ' → ' + endDate : 'Starting ' + startDate) : 'Date range not detected';
+    document.getElementById('pos-staged-content').innerHTML =
+      '<div style="margin-bottom:6px;color:var(--accent);">📎 ' + escHtml(file.name) + '</div>' +
+      '<div style="margin-bottom:6px;">📅 ' + rangeStr + '</div>' +
+      '<div style="font-size:14px;font-family:var(--display);margin-bottom:6px;">Total Bar Sales: ' + fmt$(stagedTotal) + '</div>' +
+      (parts.length ? '<div style="color:var(--muted);">' + parts.join(' &nbsp;·&nbsp; ') + '</div>' : '');
+    document.getElementById('pos-staged-preview').style.display = 'block';
     document.getElementById('upload-pos').classList.add('loaded');
-    updatePreview();
-    // Log POS submission
-    if(!S().submissionLog) S().submissionLog=[];
-    const posResult = parseToastSalesCSV(text);
-    const posTotal = posResult ? posResult.total : 0;
-    S().submissionLog.unshift({
-      id: Date.now()+'',
-      type: 'pos',
-      submittedAt: new Date().toISOString(),
-      bar: activeBar,
-      filename: file.name,
-      summary: 'POS Drop · '+file.name+' · '+fmt$(posTotal)+' total sales'+(startDate?' · '+startDate+(endDate?' → '+endDate:''):''),
-      data: text.slice(0, 50000) // store raw CSV (capped at 50kb)
-    });
-    saveLocal();
-    // Extract items and check for unmatched
-    const newItems=extractPosItems(text);
-    if(newItems.length>0) openPosReviewModal(newItems);
+    document.getElementById('pos-status').textContent = '✓ Preview ready — click Apply';
   };
   reader.readAsText(file);
 }
