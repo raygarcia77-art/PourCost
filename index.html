@@ -1356,25 +1356,25 @@ CRITICAL - EXTRACT FROM HEADER FIRST:
 - invoiceDate: The invoice date (not Due Date). For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: date at top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
 - vendor: Distributor name at top.
 
-PACK SIZE - CRITICAL FOR LAKESHORE:
-Lakeshore invoices show a pack descriptor on the line BELOW each item name, e.g. "6/4/12 CAN" or "4/6/12 CAN" or "24/12 CAN" or "12/750ML".
-You MUST capture this in the packSize field. It is the line directly under the product name.
-Example: item "NUTRL ORANGE" has "6/4/12 CAN" on the next line. Return packSize = "6/4/12 CAN"
+ITEM NAME - INCLUDE PACK DESCRIPTOR:
+For Lakeshore invoices, there is a pack size descriptor on the line directly below each item name (e.g. "6/4/12 CAN", "4/6/12 CAN", "24/12 CAN", "12/750ML").
+You MUST append this to the item name with a space.
+Example: item is "NUTRL ORANGE" with "6/4/12 CAN" below it → item field = "NUTRL ORANGE 6/4/12 CAN"
+Example: item is "MODELO ESPECIAL" with "24/12 CAN" below it → item field = "MODELO ESPECIAL 24/12 CAN"
 
 VENDORS:
 - Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
-- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. packSize = descriptor line below item name. Skip EMPTY MSTAR lines.
+- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Append pack descriptor to item name. Skip EMPTY MSTAR lines.
 - Breakthru Beverage Illinois: Ext W/O Tax = line total. unitCost = Ext W/O Tax divided by Cases qty. Skip Service Fee lines.
 - Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","packSize":"descriptor or empty string"}
-3. qty = QTY column value as shown. unitCost = per-unit cost. total = line total.
+2. Each item: {"item":"product name with pack descriptor","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
+3. qty = QTY column value as shown. unitCost = per-unit cost from invoice. total = line total.
 4. Categories: Spirits, Beer, Wine, Mixers, Other. Hard seltzers and canned cocktails = Beer.
 5. Every item must have the same invoiceNumber and invoiceDate from the header.
 6. Skip deposit lines, tax lines, service fees, $0 lines.
-7. packSize: copy the pack descriptor exactly as printed (e.g. "6/4/12 CAN"). Empty string if none.
 
 Return only the JSON array.`;
 
@@ -2340,26 +2340,6 @@ async function handleInvoiceFile(file) {
   });
   const mt = file.type || 'application/pdf';
 
-  // Pre-read PDF as text to extract Lakeshore pack descriptors ourselves
-  // Pattern: item name line followed by "6/4/12 CAN" style line
-  let pdfTextPackMap = {}; // { "NUTRL ORANGE": "6/4/12 CAN" }
-  try {
-    const rawText = await new Promise((res) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result || '');
-      r.onerror = () => res('');
-      r.readAsText(file, 'latin1');
-    });
-    // Find all pack descriptor patterns: NUMBER/NUMBER/NUMBER UNIT or NUMBER/NUMBER UNIT
-    const packRe = /([A-Z][A-Z0-9 &'()-]{2,40})\s*\n\s*(\d+\/\d+(?:\/\d+)?\s*(?:CAN|BTL|BT|ML|OZ|LT|PK)?)/gi;
-    let m;
-    while ((m = packRe.exec(rawText)) !== null) {
-      const itemName = m[1].trim().toUpperCase();
-      const packStr  = m[2].trim().toUpperCase();
-      pdfTextPackMap[itemName] = packStr;
-    }
-  } catch(e) { /* ignore — just won't have pack info */ }
-
   try {
     const items = await scanInvoiceWithClaude(base64, mt);
     document.getElementById('scan-loading').style.display='none';
@@ -2634,18 +2614,20 @@ function showInvoiceResults(items, source) {
     return nums.reduce(function(a,b){return a*b;},1);
   }
 
-  // Try to find a pack descriptor in the item name/description if AI didn't return one
-  // Lakeshore puts it on the next line: "6/4/12 CAN" "4/6/12 CAN" "24/12 CAN" "12/750ML"
+  // Extract pack descriptor from item name (Claude appends it e.g. "NUTRL ORANGE 6/4/12 CAN")
   function extractPackFromName(itemName) {
     if (!itemName) return '';
-    // Look for patterns like 6/4/12, 4/6/12, 24/12, 12/750 embedded in item name
-    var m = itemName.match(/(\d+\/\d+(?:\/\d+)?)\s*(?:CAN|BTL|BT|ML|OZ)?/i);
+    var m = itemName.match(/(\d+\/\d+(?:\/\d+)?)\s*(?:CAN|BTL|BT|ML|OZ|LT|PK)?/i);
     return m ? m[0].trim() : '';
   }
+  // Strip the pack descriptor from item name for clean display
+  function stripPackFromName(itemName) {
+    if (!itemName) return '';
+    return itemName.replace(/\s*\d+\/\d+(?:\/\d+)?\s*(?:CAN|BTL|BT|ML|OZ|LT|PK)?/i, '').trim();
+  }
 
-  // Normalize items: fix category, parse pack sizes client-side (don't rely on AI)
+  // Normalize items: fix category, parse pack sizes client-side
   pendingInvoiceItems = items.map(function(i) {
-    // Get pack descriptor — from AI field, or extract from item name
     var packStr = i.packSize || extractPackFromName(i.item) || '';
     var upc = packStr ? parsePackSize(packStr) : (i.unitsPerCase || i.unitsPerPack || 1);
     var qty = i.qty || 1;
@@ -2658,6 +2640,7 @@ function showInvoiceResults(items, source) {
     }
     return Object.assign({}, i, {
       category: i.category || i.cat || 'Other',
+      item: stripPackFromName(i.item), // remove pack descriptor from display name
       qty: qty,
       unitCost: unitCost,
       total: total,
