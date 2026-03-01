@@ -2583,17 +2583,38 @@ function showInvoiceResults(items, source) {
     document.getElementById('ai-result').classList.add('show');
     return;
   }
-  // Normalize: ensure all items use 'category' field (AI returns 'cat', CSV returns 'category')
-  // Also map unitsPerCase (from AI pack size parsing) into unitsPerPack/uom used by display
-  pendingInvoiceItems = items.map(i => {
-    const upc = i.unitsPerCase || i.unitsPerPack || 1;
-    return {
-      ...i,
+  // Parse pack size descriptor e.g. "6/4/12 CAN" -> 24 units per case
+  function parsePackSize(packStr) {
+    if (!packStr) return 1;
+    var s = packStr.toUpperCase().replace(/[A-Z ]+$/, '').trim();
+    var parts = s.split('/').map(function(p){return parseInt(p.trim());}).filter(function(n){return !isNaN(n);});
+    if (parts.length < 2) return parts[0] || 1;
+    var nums = parts.slice(0, -1); // drop last segment (oz/ml size)
+    return nums.reduce(function(a,b){return a*b;}, 1);
+  }
+
+  // Normalize items: fix category, parse pack sizes client-side
+  pendingInvoiceItems = items.map(function(i) {
+    var packStr = i.packSize || '';
+    var parsedUpc = packStr ? parsePackSize(packStr) : 0;
+    var upc = parsedUpc > 1 ? parsedUpc : (i.unitsPerCase || i.unitsPerPack || 1);
+    var qty = i.qty || 1;
+    var total = i.total || ((i.unitCost||0) * qty);
+    var unitCost = i.unitCost || 0;
+    // If AI returned case-level qty (e.g. qty=1 case, upc=24), expand to individual units
+    if (upc > 1 && qty <= (i.qty||1) && qty < upc) {
+      qty = qty * upc;
+      unitCost = total / qty;
+    }
+    return Object.assign({}, i, {
       category: i.category || i.cat || 'Other',
+      qty: qty,
+      unitCost: unitCost,
+      total: total,
       unitsPerPack: upc,
       uom: upc > 1 ? 'CSE' : (i.uom || ''),
-      trackAs: upc > 1 ? 'unit' : (i.trackAs || 'unit')
-    };
+      trackAs: 'unit'
+    });
   });
   const cats = ['Spirits','Beer','Wine','Mixers','Other'];
 
