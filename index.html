@@ -1884,7 +1884,43 @@ function addPurchase(){
 function deletePurchase(id){
   if(activeBar==='combined')return;
   S().purchases=S().purchases.filter(p=>p.id!==id);
-  saveLocal();renderPurchasesTable();showToast('Purchase removed');scheduleSync();
+  rebuildPriceHistory();
+  saveLocal();renderPurchasesTable();renderRecentInvoices();showToast('Purchase removed');scheduleSync();
+}
+
+function deleteInvoice(key){
+  if(activeBar==='combined')return;
+  const st = S();
+  // Find items belonging to this invoice key
+  const isInv = key.startsWith('inv_');
+  const invNum = isInv ? key.replace('inv_','') : null;
+  const toDelete = st.purchases.filter(p => {
+    if (invNum) return p.invoiceNumber === invNum;
+    // manual key: vendor+date
+    const mk = `manual_${p.vendor||'Unknown'}_${p.date}`;
+    return mk === key;
+  });
+  if (!toDelete.length) return;
+  const label = invNum ? `Invoice #${invNum}` : `${toDelete.length} manual entries`;
+  if (!confirm(`Delete ${label} (${toDelete.length} items, ${fmt$(toDelete.reduce((s,p)=>s+(p.total||0),0))} total)?\n\nThis will also remove from Google Sheets on next sync.`)) return;
+  const ids = new Set(toDelete.map(p=>p.id));
+  st.purchases = st.purchases.filter(p=>!ids.has(p.id));
+  // Remove this invoice from the invoiceNumbers list so it can be re-imported
+  if (invNum) st.invoiceNumbers = (st.invoiceNumbers||[]).filter(n=>n!==invNum);
+  // Rebuild price history from remaining purchases (removes orphaned entries)
+  rebuildPriceHistory();
+  saveLocal();renderPurchasesTable();renderRecentInvoices();renderPrices();renderDashboard();
+  showToast(`✓ Deleted ${toDelete.length} items from ${label}`);
+  scheduleSync();
+}
+
+function rebuildPriceHistory(){
+  // Rebuild price history entirely from current purchases so deletes are reflected
+  const st = S();
+  st.priceHistory = {};
+  st.purchases.forEach(p => {
+    updatePriceHistory(p.item, p.cat, p.cost, p.date, p.invoiceNumber);
+  });
 }
 
 function renderPurchasesTable(){
@@ -4340,6 +4376,8 @@ function renderRecentInvoices() {
         <div style="display:flex;align-items:center;gap:16px;flex-shrink:0;">
           <div style="font-family:var(--mono);font-size:13px;color:var(--text);">${fmt$(inv.total)}</div>
           <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${inv.items.length} items</div>
+          <button class="btn btn-danger" style="padding:3px 10px;font-size:10px;flex-shrink:0;"
+            onclick="event.stopPropagation();deleteInvoice('${key}')">Delete</button>
           <div id="inv-chevron-${key}" style="color:var(--muted);font-size:12px;transition:transform 0.2s;">▼</div>
         </div>
       </div>
