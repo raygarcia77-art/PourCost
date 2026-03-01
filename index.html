@@ -1349,23 +1349,26 @@ async function gasRequest(params) {
 // Call Claude API directly from browser (avoids Apps Script CORS issues for large PDFs)
 async function scanInvoiceWithClaude(base64, mimeType) {
   if (!config.claudeKey) throw new Error('Add your Claude API key in Settings to enable invoice scanning');
-  const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice image.
+  const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
-VENDORS YOU WILL SEE:
-- Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. The PRICE column is the per-unit price after deposit (use this). AMOUNT = total. Skip lines with "EMPTY KEG", "POS", "MISCELLANEOUS".
-- Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
-- Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
-- Southern Glazer's: columns LOC CASES BTLS SIZE DESCRIPTION PACK NET BTL PRICE UNIT PRICE DIV CDE UNIT DISCOUNT NET AMOUNT. UNIT PRICE = per bottle price. NET AMOUNT = line total. Skip "COOK COUNTY ALCOHOL TAX", "CHICAGO ALCOHOL EXCISE TAX", "DELIVERY CHARGE" lines.
+CRITICAL - EXTRACT FROM HEADER FIRST:
+- invoiceNumber: Find "Invoice #:" in the header. For Breakthru it is top-right, e.g. "Invoice #: 125700868". Extract digits only.
+- invoiceDate: Find "Invoice Date:" in the header. Use the INVOICE DATE not the Due Date. For Breakthru e.g. "Invoice Date: 02/18/2026" = "2026-02-18". Format YYYY-MM-DD.
+- vendor: Distributor company name at top of invoice.
+
+VENDORS:
+- Chicago Beverage Systems (CBS/Sipmarket): PRICE column = per-unit price after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS lines.
+- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Skip EMPTY MSTAR lines.
+- Breakthru Beverage Illinois: "Ext W/O Tax" = line total. unitCost = Ext W/O Tax divided by Cases qty. Skip Service Fee lines.
+- Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
-1. Return ONLY a JSON array, no other text, no markdown, no code fences.
-2. Each item: {"item": "product name", "qty": number, "unitCost": cost_per_unit, "total": line_total, "cat": category, "invoiceNumber": "...", "invoiceDate": "YYYY-MM-DD", "vendor": "vendor name"}
-3. Categories: "Spirits", "Beer", "Wine", "Mixers", "Other"
-4. Skip deposit lines, tax lines, service fees, empty keg credits, backordered items ($0.00 lines).
-5. For kegs: qty = number of kegs, unitCost = price per keg.
-6. For cases: qty = number of cases, unitCost = price per case.
-7. Include invoiceNumber, invoiceDate, and vendor on EVERY item.
-8. invoiceDate format: YYYY-MM-DD
+1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
+2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
+3. Categories: Spirits, Beer, Wine, Mixers, Other.
+4. Every item must have the same invoiceNumber and invoiceDate from the header.
+5. Skip deposit lines, tax lines, service fees, $0 lines.
+6. Kegs: qty = kegs, unitCost = price per keg. Cases: qty = cases, unitCost = price per case.
 
 Return only the JSON array.`;
 
@@ -2334,7 +2337,15 @@ async function handleInvoiceFile(file) {
   try {
     const items = await scanInvoiceWithClaude(base64, mt);
     document.getElementById('scan-loading').style.display='none';
-    showInvoiceResults(Array.isArray(items) ? items : [], 'AI scanned');
+    if (!Array.isArray(items) || !items.length) { showInvoiceResults([], 'AI scanned — no items found'); return; }
+    // Pull invoice number/date/vendor from first item
+    const firstItem = items[0];
+    pendingInvoiceNumber = firstItem.invoiceNumber || null;
+    pendingInvoiceDate   = firstItem.invoiceDate   || null;
+    pendingInvoiceVendor = firstItem.vendor        || null;
+    // Run duplicate check before showing results
+    if (pendingInvoiceNumber && checkDuplicateInvoice(pendingInvoiceNumber)) return;
+    showInvoiceResults(items, 'AI scanned' + (pendingInvoiceNumber ? ' · Invoice #'+pendingInvoiceNumber : ''));
   } catch(e) {
     document.getElementById('scan-loading').style.display='none';
     const isScriptError = e.message.includes('scanInvoice') || e.message.includes('Unknown action');
@@ -3002,6 +3013,17 @@ function confirmInvoiceItems(){
   const date = pendingInvoiceDate || new Date().toISOString().slice(0,10);
   const vendor = pendingInvoiceVendor || '';
   const active = pendingInvoiceItems.filter(i=>i!==null);
+
+  // Same-date + same-vendor warning (catches duplicates without invoice numbers)
+  if (!pendingInvoiceNumber && date && vendor) {
+    const existing = (S().purchases||[]).filter(p => p.date===date && p.vendor && p.vendor.toLowerCase()===vendor.toLowerCase());
+    if (existing.length > 0) {
+      const proceed = confirm('WARNING: Possible Duplicate\n\n' +
+        existing.length + ' items from ' + vendor + ' on ' + date + ' are already in your purchases.\n\n' +
+        'This may be a duplicate import. Proceed anyway?');
+      if (!proceed) return;
+    }
+  }
   active.forEach(i=>{
     S().purchases.push({
       id:Date.now()+Math.random()+'',
