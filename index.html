@@ -3208,12 +3208,22 @@ function submitInventory(type) {
   const staged = type==='start' ? window._stagedStart : window._stagedEnd;
   if (!staged) return;
   const label = type==='start' ? 'Start' : 'End';
-  if (!confirm(`Submit ${label} Inventory?
 
-${fmt$(staged.sum)} total from ${staged.lines} items
-File: ${staged.filename}
+  // Duplicate check — has this exact filename already been submitted as this type?
+  const log = S().submissionLog || [];
+  const dupe = log.find(e =>
+    e.type === 'inventory' &&
+    e.filename === staged.filename &&
+    e.data && e.data.type === type
+  );
+  if (dupe) {
+    const dupeDate = new Date(dupe.submittedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const proceed = confirm('DUPLICATE DETECTED\n\n' + staged.filename + ' was already submitted as ' + label + ' Inventory on ' + dupeDate + '.\n\nSubmitting again could overwrite your previous entry. Proceed anyway?');
+    if (!proceed) return;
+  }
 
-This will be saved to this week's entry.`)) return;
+  const msg = 'Submit ' + label + ' Inventory?\n\n' + fmt$(staged.sum) + ' total from ' + staged.lines + ' items\nFile: ' + staged.filename + '\n\nThis will be saved to this week entry.';
+  if (!confirm(msg)) return;
 
   // Log to submission log
   if(!S().submissionLog) S().submissionLog=[];
