@@ -2917,52 +2917,124 @@ function clearScan(){document.getElementById('ai-result').classList.remove('show
 // ══════════════════════════════════════════════
 // CSV UPLOAD
 // ══════════════════════════════════════════════
-function extractDateFromFilename(filename) {
-  // Try common date patterns in filenames
-  const patterns = [
-    // YYYY-MM-DD or YYYY_MM_DD
-    { re: /(\d{4})[-_](\d{2})[-_](\d{2})/, y:1, m:2, d:3 },
-    // MM-DD-YYYY or MM_DD_YYYY
-    { re: /(\d{2})[-_](\d{2})[-_](\d{4})/, y:3, m:1, d:2 },
-    // MM-DD-YY or MM_DD_YY
-    { re: /(\d{2})[-_](\d{2})[-_](\d{2})(?!\d)/, y:3, m:1, d:2, shortYear:true },
-    // M.D.YY or MM.DD.YY  e.g. 2.23.26 or 02.23.26
-    { re: /(\d{1,2})\.(\d{1,2})\.(\d{2})(?!\d)/, y:3, m:1, d:2, shortYear:true },
-    // M.D.YYYY or MM.DD.YYYY
-    { re: /(\d{1,2})\.(\d{1,2})\.(\d{4})/, y:3, m:1, d:2 },
-    // MMDDYYYY
-    { re: /(\d{2})(\d{2})(\d{4})/, y:3, m:1, d:2 },
-    // Month name: Jan, Feb, etc.
-    { re: /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})[-_,\s]*(\d{2,4})/i, named:true }
-  ];
+// Parse a single date from a string fragment, returns Date or null
+function parseDateFragment(str, defaultYear) {
+  const monthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  // "feb16" or "feb 16"
+  const mnd = str.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})$/i);
+  if (mnd) {
+    const m = monthNames[mnd[1].toLowerCase().slice(0,3)];
+    const d = parseInt(mnd[2]);
+    const y = defaultYear || new Date().getFullYear();
+    if (m && d>=1 && d<=31) return new Date(y, m-1, d);
+  }
+  // "16" bare number — just a day, needs month context (handled by caller)
+  const bare = str.match(/^(\d{1,2})$/);
+  if (bare) return { dayOnly: parseInt(bare[1]) };
+  // MM-DD or MM/DD
+  const mdd = str.match(/^(\d{1,2})[-\/](\d{1,2})$/);
+  if (mdd) {
+    const y = defaultYear || new Date().getFullYear();
+    return new Date(y, parseInt(mdd[1])-1, parseInt(mdd[2]));
+  }
+  return null;
+}
 
-  for (const p of patterns) {
-    const match = filename.match(p.re);
-    if (!match) continue;
-    try {
-      let year, month, day;
-      if (p.named) {
-        const monthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-        month = monthNames[match[1].toLowerCase().slice(0,3)];
-        day = parseInt(match[2]);
-        year = parseInt(match[3]);
-        if (year < 100) year += 2000;
-      } else {
-        year  = parseInt(match[p.y]);
-        month = parseInt(match[p.m]);
-        day   = parseInt(match[p.d]);
-        if (p.shortYear) year += 2000;
-      }
-      if (year < 2000 || year > 2100) continue;
-      if (month < 1 || month > 12) continue;
-      if (day < 1 || day > 31) continue;
-      const date = new Date(year, month-1, day);
-      if (isNaN(date.getTime())) continue;
-      // Convert to ISO week string YYYY-Www
-      const jan1 = new Date(date.getFullYear(), 0, 1);
-      const wk = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-      return `${date.getFullYear()}-W${String(wk).padStart(2,'0')}`;
-    } catch(e) { continue; }
+// Extract date range from filename — returns { startDate, endDate } as YYYY-MM-DD strings, or nulls
+function extractDateRangeFromFilename(filename) {
+  const fn = filename.replace(/\.[^.]+$/, ''); // strip extension
+  const monthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+
+  // Extract year first — look for 4-digit year or 2-digit year at end
+  let year = null;
+  const yearMatch = fn.match(/(\d{4})/) || fn.match(/[-_](\d{2})$/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1]);
+    if (year < 100) year += 2000;
+    if (year < 2000 || year > 2100) year = null;
+  }
+  if (!year) year = new Date().getFullYear();
+
+  // Pattern: "feb16-22-2026" or "feb16-22" — month + startDay - endDay
+  const rangeMonthDay = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})[-_](\d{1,2})/i);
+  if (rangeMonthDay) {
+    const m = monthNames[rangeMonthDay[1].toLowerCase().slice(0,3)];
+    const d1 = parseInt(rangeMonthDay[2]);
+    const d2 = parseInt(rangeMonthDay[3]);
+    if (m && d1>=1 && d1<=31 && d2>=1 && d2<=31) {
+      // d2 might be end day OR part of year — only treat as end day if <= 31 and < year
+      const endDay = d2 <= 31 ? d2 : null;
+      const startDate = new Date(year, m-1, d1);
+      const endDate = endDay ? new Date(year, m-1, endDay) : null;
+      return {
+        startDate: fmtDate(startDate),
+        endDate: endDate ? fmtDate(endDate) : null
+      };
+    }
+  }
+
+  // Pattern: "feb16-feb22-2026" — two full month+day combos
+  const twoMonths = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\d{1,2})[-_](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\d{1,2})/i);
+  if (twoMonths) {
+    const m1 = monthNames[twoMonths[1].toLowerCase().slice(0,3)];
+    const d1 = parseInt(twoMonths[2]);
+    const m2 = monthNames[twoMonths[3].toLowerCase().slice(0,3)];
+    const d2 = parseInt(twoMonths[4]);
+    if (m1 && m2) {
+      return {
+        startDate: fmtDate(new Date(year, m1-1, d1)),
+        endDate: fmtDate(new Date(year, m2-1, d2))
+      };
+    }
+  }
+
+  // Fallback: single date (original behavior)
+  const single = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})/i);
+  if (single) {
+    const m = monthNames[single[1].toLowerCase().slice(0,3)];
+    const d = parseInt(single[2]);
+    if (m && d>=1 && d<=31) {
+      return { startDate: fmtDate(new Date(year, m-1, d)), endDate: null };
+    }
+  }
+
+  return { startDate: null, endDate: null };
+}
+
+function fmtDate(d) {
+  if (!d || isNaN(d.getTime())) return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function extractDateFromFilename(filename) {
+  // Legacy single-date version — returns week string for inventory uploads
+  const { startDate } = extractDateRangeFromFilename(filename);
+  if (!startDate) return null;
+  const date = new Date(startDate);
+  const jan1 = new Date(date.getFullYear(), 0, 1);
+  const wk = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${date.getFullYear()}-W${String(wk).padStart(2,'0')}`;
+}
+
+// Check if a new POS date range overlaps with any existing weekly entries
+function checkPOSDateOverlap(newStart, newEnd) {
+  const weeks = S().weeks || [];
+  if (!weeks.length) return null;
+  const ns = new Date(newStart);
+  const ne = newEnd ? new Date(newEnd) : null;
+  for (const w of weeks) {
+    if (!w.startDate) continue;
+    const ws = new Date(w.startDate);
+    const we = w.endDate ? new Date(w.endDate) : null;
+    // Check overlap: new start falls within existing range
+    if (ne && we) {
+      // Both ranges known — full overlap check
+      if (ns <= we && ne >= ws) return w;
+    } else {
+      // Partial info — check if start date falls within existing week
+      if (we && ns >= ws && ns <= we) return w;
+      if (!we && ws.toDateString() === ns.toDateString()) return w;
+    }
   }
   return null;
 }
@@ -2992,6 +3064,32 @@ function handleInventoryUpload(input,type){
 }
 function handlePOSUpload(input){
   const file=input.files[0];if(!file)return;
+
+  // Extract date range from filename and check for overlaps
+  const { startDate, endDate } = extractDateRangeFromFilename(file.name);
+  if (startDate) {
+    const overlap = checkPOSDateOverlap(startDate, endDate);
+    if (overlap) {
+      const overlapWeek = getWeekLabel(overlap.week);
+      const rangeStr = endDate ? `${startDate} to ${endDate}` : `starting ${startDate}`;
+      const proceed = confirm(
+        `⚠️ DATE OVERLAP DETECTED\n\n` +
+        `This file covers ${rangeStr}\n` +
+        `but week "${overlapWeek}" already has POS data for overlapping dates.\n\n` +
+        `Importing this could double-count sales.\n\nProceed anyway?`
+      );
+      if (!proceed) { input.value=''; return; }
+    }
+    // Auto-fill start/end date fields from filename
+    const startEl = document.getElementById('entry-start-date');
+    const endEl = document.getElementById('entry-end-date');
+    if (startEl && !startEl.value) startEl.value = startDate + 'T00:00';
+    if (endEl && endDate) endEl.value = endDate + 'T23:59';
+    updatePosDateBanner();
+    const rangeStr = endDate ? `${startDate} → ${endDate}` : startDate;
+    showToast(`📅 Date range detected: ${rangeStr}`);
+  }
+
   const reader=new FileReader();
   reader.onload=(e)=>{
     const text=e.target.result;
@@ -3035,7 +3133,7 @@ function handlePOSUpload(input){
       submittedAt: new Date().toISOString(),
       bar: activeBar,
       filename: file.name,
-      summary: 'POS Drop · '+file.name+' · '+fmt$(posTotal)+' total sales',
+      summary: 'POS Drop · '+file.name+' · '+fmt$(posTotal)+' total sales'+(startDate?' · '+startDate+(endDate?' → '+endDate:''):''),
       data: text.slice(0, 50000) // store raw CSV (capped at 50kb)
     });
     saveLocal();
