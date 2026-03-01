@@ -1352,25 +1352,36 @@ async function scanInvoiceWithClaude(base64, mimeType) {
   const prompt = `You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice.
 
 CRITICAL - EXTRACT FROM HEADER FIRST:
-- invoiceNumber: Find "Invoice #:" in the header. For Breakthru it is top-right, e.g. "Invoice #: 125700868". Extract digits only.
-- invoiceDate: Find "Invoice Date:" in the header. Use the INVOICE DATE not the Due Date. For Breakthru e.g. "Invoice Date: 02/18/2026" = "2026-02-18". Format YYYY-MM-DD.
+- invoiceNumber: Find "Invoice #:" or "Invoice#:" in the header. For Breakthru: top-right block "Invoice #: 125700868". For Lakeshore: "Invoice#: 545037". Extract digits only.
+- invoiceDate: Find "Invoice Date:" or the date near the invoice number. For Breakthru: "Invoice Date: 02/18/2026". For Lakeshore: the date at the top e.g. "Wed Feb 18, 2026" = "2026-02-18". Format YYYY-MM-DD.
 - vendor: Distributor company name at top of invoice.
 
+PACK SIZE PARSING (very important for canned goods):
+- Lakeshore invoices show a pack descriptor on the line below the item name, e.g. "6/4/12 CAN" or "4/6/12 CAN" or "24/12 CAN".
+- Parse these as: segments separated by "/" where the LAST segment is the can size (oz, ignore it) and the preceding numbers are multiplied together to get total units per case.
+- Examples: "6/4/12 CAN" = 6 x 4 = 24 cans per case. "4/6/12 CAN" = 4 x 6 = 24 cans. "24/12 CAN" = 24 cans. "12/750ML" = 12 bottles.
+- qty = number of cases ordered (the QTY column)
+- unitCost = EXT (line total after discount) divided by total units (cases x units per case)
+- total = EXT value
+- Add a "unitsPerCase" field with the calculated pack count (e.g. 24)
+- Add a "packSize" field with the raw descriptor string (e.g. "6/4/12 CAN")
+
 VENDORS:
-- Chicago Beverage Systems (CBS/Sipmarket): PRICE column = per-unit price after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS lines.
-- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Skip EMPTY MSTAR lines.
-- Breakthru Beverage Illinois: "Ext W/O Tax" = line total. unitCost = Ext W/O Tax divided by Cases qty. Skip Service Fee lines.
+- Chicago Beverage Systems (CBS/Sipmarket): PRICE = per-unit after deposit. AMOUNT = line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
+- Lakeshore Beverage: D.Price = discounted unit price. EXT = line total. Apply pack size parsing above. Skip EMPTY MSTAR lines.
+- Breakthru Beverage Illinois: "Ext W/O Tax" = line total. unitCost = Ext W/O Tax / Cases qty. Skip Service Fee lines.
 - Southern Glazer's: UNIT PRICE = per bottle. NET AMOUNT = line total. Skip tax and delivery lines.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
-2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name"}
-3. Categories: Spirits, Beer, Wine, Mixers, Other.
+2. Each item: {"item":"product name","qty":number,"unitCost":cost_per_unit,"total":line_total,"cat":"category","invoiceNumber":"number","invoiceDate":"YYYY-MM-DD","vendor":"name","unitsPerCase":number,"packSize":"string"}
+3. Categories: Spirits, Beer, Wine, Mixers, Other. Canned seltzers and hard seltzers = Beer.
 4. Every item must have the same invoiceNumber and invoiceDate from the header.
 5. Skip deposit lines, tax lines, service fees, $0 lines.
-6. Kegs: qty = kegs, unitCost = price per keg. Cases: qty = cases, unitCost = price per case.
+6. Kegs: qty = kegs, unitCost = price per keg, unitsPerCase = 1.
+7. If no pack size info, set unitsPerCase = 1 and packSize = "".
 
-Return only the JSON array.`;
+Return only the JSON array.`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -2573,7 +2584,17 @@ function showInvoiceResults(items, source) {
     return;
   }
   // Normalize: ensure all items use 'category' field (AI returns 'cat', CSV returns 'category')
-  pendingInvoiceItems = items.map(i => ({...i, category: i.category || i.cat || 'Other'}));
+  // Also map unitsPerCase (from AI pack size parsing) into unitsPerPack/uom used by display
+  pendingInvoiceItems = items.map(i => {
+    const upc = i.unitsPerCase || i.unitsPerPack || 1;
+    return {
+      ...i,
+      category: i.category || i.cat || 'Other',
+      unitsPerPack: upc,
+      uom: upc > 1 ? 'CSE' : (i.uom || ''),
+      trackAs: upc > 1 ? 'unit' : (i.trackAs || 'unit')
+    };
+  });
   const cats = ['Spirits','Beer','Wine','Mixers','Other'];
 
   const buildRow = (i, idx) => {
@@ -2613,10 +2634,10 @@ function showInvoiceResults(items, source) {
       </td>
       <td style="padding:4px 6px;text-align:center;">
         ${isCse ? `
-        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;">${i.unitsPerPack}/case</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;">${i.packSize ? escHtml(i.packSize) : i.unitsPerPack+'/case'}</div>
         <div style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;width:fit-content;margin:0 auto;">
           <button onclick="setInvTrackAs(${idx},'unit')" id="inv-track-unit-${idx}"
-            style="padding:2px 7px;font-size:10px;font-family:var(--mono);cursor:pointer;border:none;background:${trackAs==='unit'?'rgba(212,168,67,0.2)':'none'};color:${trackAs==='unit'?'var(--accent)':'var(--muted)'};">btl</button>
+            style="padding:2px 7px;font-size:10px;font-family:var(--mono);cursor:pointer;border:none;background:${trackAs==='unit'?'rgba(212,168,67,0.2)':'none'};color:${trackAs==='unit'?'var(--accent)':'var(--muted)'};">each</button>
           <button onclick="setInvTrackAs(${idx},'case')" id="inv-track-case-${idx}"
             style="padding:2px 7px;font-size:10px;font-family:var(--mono);cursor:pointer;border:none;border-left:1px solid var(--border);background:${trackAs==='case'?'rgba(212,168,67,0.2)':'none'};color:${trackAs==='case'?'var(--accent)':'var(--muted)'};">case</button>
         </div>` : `<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">${i.uom||'EA'}</span>`}
