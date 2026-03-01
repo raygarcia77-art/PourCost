@@ -1771,14 +1771,9 @@ function confirmWeekSubmit() {
     '',
     startDate ? '  Period Start: ' + startDate.replace('T',' ') : '',
     endDate   ? '  Period End:   ' + endDate.replace('T',' ') : '',
-  ].filter(l => l !== undefined && !(l==='' && !startDate && !endDate)).join('
-');
+  ].filter(l => l !== undefined && !(l==='' && !startDate && !endDate)).join('\n');
 
-  if (confirm('CONFIRM WEEK SUBMISSION
-
-' + lines + '
-
-Submit this entry?')) {
+  if (confirm('CONFIRM WEEK SUBMISSION\n\n' + lines + '\n\nSubmit this entry?')) {
     addWeekEntry();
   }
 }
