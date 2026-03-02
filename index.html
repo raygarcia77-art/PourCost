@@ -1622,7 +1622,7 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='dashboard') renderDashboard();
-  else if (name==='weekly') { renderWeeklyTable(); tryCarryForward(); autoFillPurchases(); }
+  else if (name==='weekly') { renderWeeklyTable(); tryCarryForward(); autoFillPurchases(); restoreLatestPOS(); }
   else if (name==='purchases') { renderPurchasesTable(); renderRecentInvoices(); renderTransferHistory(); }
   else if (name==='wastelog') renderWasteLog();
   else if (name==='depletion') renderDepletion();
@@ -4661,6 +4661,31 @@ function renderShrinkageDashboard(){
 // ══════════════════════════════════════════════
 // INVENTORY CARRY-FORWARD
 // ══════════════════════════════════════════════
+function restoreLatestPOS() {
+  // If sales field is already filled, don't overwrite
+  const salesEl = document.getElementById('entry-sales');
+  if (salesEl && parseFloat(salesEl.value) > 0) return;
+
+  // Find the most recent POS submission log entry
+  const log = S().submissionLog || [];
+  const latest = log.find(e => e.type === 'pos' && e.data);
+  if (!latest) return;
+
+  const result = parseToastSalesCSV(latest.data);
+  if (!result) return;
+
+  if (salesEl) salesEl.value = result.total.toFixed(2);
+  if (result.spirits) document.getElementById('entry-sales-spirits').value = result.spirits.toFixed(2);
+  if (result.beer)    document.getElementById('entry-sales-beer').value    = result.beer.toFixed(2);
+  if (result.wine)    document.getElementById('entry-sales-wine').value    = result.wine.toFixed(2);
+  if (result.mixers)  document.getElementById('entry-sales-mixers').value  = result.mixers.toFixed(2);
+
+  const hint = document.getElementById('cat-sales-hint');
+  if (hint) hint.textContent = '↑ Restored from last POS submission · ' + (latest.filename||'');
+  updatePreview();
+}
+
+
 function tryCarryForward() {
   if (activeBar==='combined') return;
   const weeks = S().weeks;
@@ -4668,13 +4693,11 @@ function tryCarryForward() {
   const lastWeek = weeks[weeks.length-1];
   const entryStartEl = document.getElementById('entry-start');
   const hintEl = document.getElementById('carry-forward-hint');
-  // Only auto-fill if entry-start is empty
   if (entryStartEl && (!entryStartEl.value || parseFloat(entryStartEl.value)===0)) {
     entryStartEl.value = lastWeek.end.toFixed(2);
     if (hintEl) hintEl.style.display = 'block';
     updatePreview();
   }
-  // Carry forward the end date of last week as start date for new week
   const startDateEl = document.getElementById('entry-start-date');
   if (startDateEl && !startDateEl.value && lastWeek.endDate) {
     startDateEl.value = lastWeek.endDate;
