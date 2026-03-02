@@ -634,7 +634,6 @@ input::placeholder{color:var(--muted);}
         </div>
       </div>
 
-      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;letter-spacing:1px;margin-bottom:8px;" onclick="confirmWeekSubmit()">&#128190; SAVE PERIOD</button>
       </div><!-- /sb-weekly-form -->
       <div class="table-wrap">
         <table><thead><tr><th>Period</th><th>Date Range</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th><th>Sync</th><th></th></tr></thead>
@@ -3316,7 +3315,20 @@ function extractDateRangeFromFilename(filename) {
   const fn = filename.replace(/\.[^.]+$/, ''); // strip extension
   const monthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 
-  // Extract year first — look for 4-digit year or 2-digit year at end
+  // ── Pattern: numeric M.D.YY or M.D.YYYY e.g. "2.16.25" or "2.16.2025" ──
+  // Also handles separators: 2-16-25, 2/16/25
+  const numericDate = fn.match(/\b(\d{1,2})[.\/\-](\d{1,2})[.\/\-](\d{2,4})\b/);
+  if (numericDate) {
+    let m = parseInt(numericDate[1]);
+    let d = parseInt(numericDate[2]);
+    let y = parseInt(numericDate[3]);
+    if (y < 100) y += 2000;
+    if (m>=1 && m<=12 && d>=1 && d<=31 && y>=2000 && y<=2100) {
+      return { startDate: fmtDate(new Date(y, m-1, d)), endDate: null };
+    }
+  }
+
+  // Extract year — 4-digit preferred, 2-digit at end as fallback
   let year = null;
   const yearMatch = fn.match(/(\d{4})/) || fn.match(/[-_](\d{2})$/);
   if (yearMatch) {
@@ -3325,24 +3337,6 @@ function extractDateRangeFromFilename(filename) {
     if (year < 2000 || year > 2100) year = null;
   }
   if (!year) year = new Date().getFullYear();
-
-  // Pattern: "feb16-22-2026" or "feb16-22" — month + startDay - endDay
-  const rangeMonthDay = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})[-_](\d{1,2})/i);
-  if (rangeMonthDay) {
-    const m = monthNames[rangeMonthDay[1].toLowerCase().slice(0,3)];
-    const d1 = parseInt(rangeMonthDay[2]);
-    const d2 = parseInt(rangeMonthDay[3]);
-    if (m && d1>=1 && d1<=31 && d2>=1 && d2<=31) {
-      // d2 might be end day OR part of year — only treat as end day if <= 31 and < year
-      const endDay = d2 <= 31 ? d2 : null;
-      const startDate = new Date(year, m-1, d1);
-      const endDate = endDay ? new Date(year, m-1, endDay) : null;
-      return {
-        startDate: fmtDate(startDate),
-        endDate: endDate ? fmtDate(endDate) : null
-      };
-    }
-  }
 
   // Pattern: "feb16-feb22-2026" — two full month+day combos
   const twoMonths = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\d{1,2})[-_](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\d{1,2})/i);
@@ -3359,7 +3353,21 @@ function extractDateRangeFromFilename(filename) {
     }
   }
 
-  // Fallback: single date (original behavior)
+  // Pattern: "feb16-22" — month + startDay - endDay
+  const rangeMonthDay = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})[-_](\d{1,2})/i);
+  if (rangeMonthDay) {
+    const m = monthNames[rangeMonthDay[1].toLowerCase().slice(0,3)];
+    const d1 = parseInt(rangeMonthDay[2]);
+    const d2 = parseInt(rangeMonthDay[3]);
+    if (m && d1>=1 && d1<=31 && d2>=1 && d2<=31) {
+      return {
+        startDate: fmtDate(new Date(year, m-1, d1)),
+        endDate: fmtDate(new Date(year, m-1, d2))
+      };
+    }
+  }
+
+  // Pattern: single "feb16" or "feb 16"
   const single = fn.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-_\s]*(\d{1,2})/i);
   if (single) {
     const m = monthNames[single[1].toLowerCase().slice(0,3)];
@@ -3413,15 +3421,18 @@ function checkPOSDateOverlap(newStart, newEnd) {
 function handleInventoryUpload(input,type){
   const file=input.files[0];if(!file)return;
 
-  // Try to extract date from filename and set week picker
-  const detectedWeek = extractDateFromFilename(file.name);
-  if (detectedWeek) {
-    const weekPicker = document.getElementById('week-picker');
-    const entryWeek  = document.getElementById('entry-week');
-    if (weekPicker) weekPicker.value = detectedWeek;
-    if (entryWeek)  entryWeek.value  = detectedWeek;
-    updateWeekLabel();
-    showToast(`📅 Week auto-set from filename: ${getWeekLabel(detectedWeek)}`);
+  // Extract date from filename and auto-set the correct count date field
+  const { startDate: detectedDate } = extractDateRangeFromFilename(file.name);
+  if (detectedDate) {
+    if (type==='start') {
+      const el = document.getElementById('entry-start-date');
+      if (el && !el.value) { el.value = detectedDate; onPeriodDateChange(); }
+      showToast('📅 Opening count date set from filename: ' + detectedDate);
+    } else {
+      const el = document.getElementById('entry-end-date');
+      if (el && !el.value) { el.value = detectedDate; onPeriodDateChange(); }
+      showToast('📅 Closing count date set from filename: ' + detectedDate);
+    }
   }
 
   const reader=new FileReader();
@@ -3433,13 +3444,13 @@ function handleInventoryUpload(input,type){
       document.getElementById('start-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
       document.getElementById('upload-start').classList.add('loaded');
       document.getElementById('submit-start-btn').style.display='block';
-      window._stagedStart = { sum, lines: lines.length-1, filename: input.files[0]?.name };
+      window._stagedStart = { sum, lines: lines.length-1, filename: file.name, detectedDate };
     } else {
       document.getElementById('entry-end').value=sum.toFixed(2);
       document.getElementById('end-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
       document.getElementById('upload-end').classList.add('loaded');
       document.getElementById('submit-end-btn').style.display='block';
-      window._stagedEnd = { sum, lines: lines.length-1, filename: input.files[0]?.name };
+      window._stagedEnd = { sum, lines: lines.length-1, filename: file.name, detectedDate };
     }
     updatePreview();
   };reader.readAsText(file);
