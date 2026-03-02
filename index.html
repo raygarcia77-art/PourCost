@@ -634,6 +634,7 @@ input::placeholder{color:var(--muted);}
           <div><div class="stat-label">Target</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">18–24% spirits<br>24–30% overall avg</div></div>
         </div>
       </div>
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;letter-spacing:1px;margin-bottom:8px;" onclick="confirmWeekSubmit()">&#128190; SAVE WEEK</button>
       </div><!-- /sb-weekly-form -->
       <div class="table-wrap">
         <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th><th>Sync</th><th></th></tr></thead>
@@ -3896,8 +3897,11 @@ function resubmitWeeklyEntry(i) {
   if(d.salesBeer) document.getElementById('entry-sales-beer').value = d.salesBeer;
   if(d.salesWine) document.getElementById('entry-sales-wine').value = d.salesWine;
   if(d.salesMixers) document.getElementById('entry-sales-mixers').value = d.salesMixers;
+  if(d.startDate) document.getElementById('entry-start-date').value = d.startDate;
+  if(d.endDate) document.getElementById('entry-end-date').value = d.endDate;
+  updatePreview();
   switchTab('weekly');
-  showToast('✓ Weekly entry loaded — edit and re-save');
+  showToast('✓ Weekly entry loaded — review and click SAVE WEEK');
 }
 
 function resubmitInvoiceEntry(i) {
