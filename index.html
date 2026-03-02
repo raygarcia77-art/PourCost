@@ -505,7 +505,7 @@ input::placeholder{color:var(--muted);}
 
       <div class="section-header"><div class="section-title">RECENT WEEKS</div></div>
       <div class="table-wrap">
-        <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Status</th></tr></thead>
+        <table><thead><tr><th>Period</th><th>Date Range</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Status</th></tr></thead>
         <tbody id="history-table-body"><tr><td colspan="8" class="empty-state">No data yet</td></tr></tbody></table>
       </div>
 
@@ -553,80 +553,79 @@ input::placeholder{color:var(--muted);}
         </div>
       </div>
       <hr class="divider">
-      <div class="section-header"><div class="section-title">WEEKLY ENTRY</div></div>
+      <div class="section-header"><div class="section-title">PERIOD ENTRY</div></div>
       <div id="sb-weekly-form">
+
+      <!-- Save button at top -->
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;letter-spacing:1px;margin-bottom:16px;" onclick="confirmWeekSubmit()">&#128190; SAVE PERIOD</button>
+
       <!-- POS Date Range Reminder Banner -->
       <div id="pos-date-banner" style="display:none;margin-bottom:16px;padding:14px 18px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:6px;">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">📅 POS REPORT DATE RANGE</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">📅 POS REPORT MUST COVER</div>
         <div style="font-family:var(--display);font-size:18px;letter-spacing:1px;" id="pos-date-range-text">—</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;" id="pos-date-range-sub">Run your POS report for this exact date range to match this inventory period</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;" id="pos-date-range-sub">Run your POS report for this exact date range</div>
       </div>
 
+      <!-- Inventory Dates — defines the period -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:14px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">📦 INVENTORY COUNT DATES <span style="color:var(--muted);font-size:9px;">— defines the period. POS report must match.</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="form-group" style="margin:0;">
+            <label>Opening Count Date</label>
+            <input type="date" id="entry-start-date" onchange="onPeriodDateChange()">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="start-date-hint">Date you counted opening inventory</div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Closing Count Date</label>
+            <input type="date" id="entry-end-date" onchange="onPeriodDateChange()">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="end-date-hint">Date you counted closing inventory</div>
+          </div>
+        </div>
+      </div>
 
+      <!-- Period ID (hidden, derived from dates) -->
+      <input type="hidden" id="entry-week">
 
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:10px;">
-        <div class="form-group"><label>Week</label><input type="week" id="entry-week"></div>
-        <div class="form-group"><label>Start Inv $</label>
-          <input type="number" id="entry-start" placeholder="0.00" step="0.01">
-          <div id="carry-forward-hint" style="font-family:var(--mono);font-size:10px;color:var(--green);margin-top:3px;display:none;">↑ Auto-filled from last week's ending inventory</div>
+        <div class="form-group">
+          <label>Start Inv $</label>
+          <input type="number" id="entry-start" placeholder="0.00" step="0.01" oninput="updatePreview()">
+          <div id="carry-forward-hint" style="font-family:var(--mono);font-size:10px;color:var(--green);margin-top:3px;display:none;">↑ Carried from last period</div>
         </div>
-        <div class="form-group"><label>Purchases $
-          <button type="button" onclick="autoFillPurchases()" title="Sum purchases for the selected week"
-            style="margin-left:6px;font-size:9px;padding:2px 7px;background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.3);color:var(--accent);border-radius:3px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px;">↓ AUTO-FILL</button>
+        <div class="form-group">
+          <label>Purchases $
+            <button type="button" onclick="autoFillPurchases()" title="Sum purchases for this period"
+              style="margin-left:6px;font-size:9px;padding:2px 7px;background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.3);color:var(--accent);border-radius:3px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px;">↓ AUTO-FILL</button>
           </label>
           <input type="number" id="entry-purchases" placeholder="0.00" step="0.01" oninput="updatePreview()">
           <div id="purchases-autofill-hint" style="font-family:var(--mono);font-size:10px;color:var(--green);margin-top:3px;display:none;"></div>
         </div>
-        <div class="form-group"><label>End Inv $</label><input type="number" id="entry-end" placeholder="0.00" step="0.01"></div>
+        <div class="form-group">
+          <label>End Inv $</label>
+          <input type="number" id="entry-end" placeholder="0.00" step="0.01" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+          <label>Total Bar Sales $</label>
+          <input type="number" id="entry-sales" placeholder="0.00" step="0.01" oninput="updatePreview()">
+        </div>
       </div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:16px;">
-        <div class="form-group"><label>Total Bar Sales $</label><input type="number" id="entry-sales" placeholder="0.00" step="0.01" oninput="updatePreview()"></div>
+      <div class="form-grid" style="grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
         <div class="form-group"><label>Notes</label><input type="text" id="entry-notes" placeholder="Optional"></div>
-        <div></div>
-        <div class="form-group"><label>&nbsp;</label></div>
       </div>
 
-      <!-- Category Sales Breakdown (auto-filled from POS upload) -->
+      <!-- Category Sales Breakdown -->
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:16px;" id="cat-sales-box">
         <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">🖥️ SALES BY CATEGORY <span style="color:var(--muted);font-size:9px;">— auto-filled from POS upload, or enter manually</span></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-          <div class="form-group" style="margin:0;">
-            <label>Spirits / Liquor $</label>
-            <input type="number" id="entry-sales-spirits" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Beer (Draft + Bottles) $</label>
-            <input type="number" id="entry-sales-beer" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Wine $</label>
-            <input type="number" id="entry-sales-wine" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Mixers / NA / Other $</label>
-            <input type="number" id="entry-sales-mixers" placeholder="0.00" step="0.01" oninput="recalcTotalSales()">
-          </div>
+          <div class="form-group" style="margin:0;"><label>Spirits / Liquor $</label><input type="number" id="entry-sales-spirits" placeholder="0.00" step="0.01" oninput="recalcTotalSales()"></div>
+          <div class="form-group" style="margin:0;"><label>Beer (Draft + Bottles) $</label><input type="number" id="entry-sales-beer" placeholder="0.00" step="0.01" oninput="recalcTotalSales()"></div>
+          <div class="form-group" style="margin:0;"><label>Wine $</label><input type="number" id="entry-sales-wine" placeholder="0.00" step="0.01" oninput="recalcTotalSales()"></div>
+          <div class="form-group" style="margin:0;"><label>Mixers / NA / Other $</label><input type="number" id="entry-sales-mixers" placeholder="0.00" step="0.01" oninput="recalcTotalSales()"></div>
         </div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;" id="cat-sales-hint">Upload your Toast Sales Category report to auto-fill these fields</div>
       </div>
 
-      <!-- Inventory Date Tracker -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:16px;">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;">📦 INVENTORY COUNT DATES <span style="color:var(--muted);font-size:9px;">— used to calculate exact POS report range</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div class="form-group" style="margin:0;">
-            <label>Start Count Date &amp; Time</label>
-            <input type="datetime-local" id="entry-start-date" onchange="updatePosDateBanner()">
-            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="start-date-hint">When did you finish counting opening inventory?</div>
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>End Count Date &amp; Time</label>
-            <input type="datetime-local" id="entry-end-date" onchange="updatePosDateBanner()">
-            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;" id="end-date-hint">When did you finish counting closing inventory?</div>
-          </div>
-        </div>
-      </div>
-      <div id="weekly-calc-preview" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:18px;margin-bottom:20px;">
+      <div id="weekly-calc-preview" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:18px;margin-bottom:16px;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">
           <div><div class="stat-label">COGS $</div><div style="font-family:var(--display);font-size:26px;" id="preview-cogs-dollar">$0.00</div></div>
           <div><div class="stat-label">COGS %</div><div style="font-family:var(--display);font-size:26px;" id="preview-cogs-pct">0.0%</div></div>
@@ -634,10 +633,11 @@ input::placeholder{color:var(--muted);}
           <div><div class="stat-label">Target</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2;">18–24% spirits<br>24–30% overall avg</div></div>
         </div>
       </div>
-      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;letter-spacing:1px;margin-bottom:8px;" onclick="confirmWeekSubmit()">&#128190; SAVE WEEK</button>
+
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;letter-spacing:1px;margin-bottom:8px;" onclick="confirmWeekSubmit()">&#128190; SAVE PERIOD</button>
       </div><!-- /sb-weekly-form -->
       <div class="table-wrap">
-        <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th><th>Sync</th><th></th></tr></thead>
+        <table><thead><tr><th>Period</th><th>Date Range</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th><th>Sync</th><th></th></tr></thead>
         <tbody id="weekly-table-body"><tr><td colspan="10" class="empty-state">No entries yet</td></tr></tbody></table>
       </div>
 
@@ -1079,7 +1079,7 @@ input::placeholder{color:var(--muted);}
         <div class="totals-card"><div class="totals-card-title">YEARLY COGS %</div><div id="yearly-breakdown"></div></div>
       </div>
       <div class="table-wrap">
-        <table><thead><tr><th>Week</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Status</th><th>Notes</th></tr></thead>
+        <table><thead><tr><th>Period</th><th>Date Range</th><th>Start Inv</th><th>Purchases</th><th>End Inv</th><th>COGS $</th><th>Sales</th><th>COGS %</th><th>Notes</th></tr></thead>
         <tbody id="all-weeks-body"><tr><td colspan="9" class="empty-state">No history yet</td></tr></tbody></table>
       </div>
     </div>
@@ -1694,7 +1694,28 @@ function escHtml(s){
     .replace(/"/g,'\x26quot;');
 }
 function showToast(msg,isErr=false){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isErr?' err':'');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
-function getWeekLabel(w){if(!w)return'—';try{const [y,wk]=w.split('-W');const d=new Date(+y,0,1+(parseInt(wk)-1)*7);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return w;}}
+function getWeekLabel(w){
+  if(!w) return '—';
+  // Period format: "2026-02-15_2026-02-22"
+  if(w.includes('_')) {
+    const [s,e] = w.split('_');
+    const sd = new Date(s+'T12:00:00'), ed = new Date(e+'T12:00:00');
+    const fmt = d => isNaN(d)?'?':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return fmt(sd) + ' – ' + fmt(ed);
+  }
+  // Legacy week format: "2026-W08"
+  try{const [y,wk]=w.split('-W');const d=new Date(+y,0,1+(parseInt(wk)-1)*7);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return w;}
+}
+function getPeriodNumber(barId, periodId) {
+  const weeks = states[barId||activeBar].weeks || [];
+  const sorted = [...weeks].sort((a,b)=>a.week.localeCompare(b.week));
+  const idx = sorted.findIndex(w=>w.week===periodId);
+  return idx >= 0 ? idx+1 : sorted.length+1;
+}
+function getPeriodLabel(barId, periodId) {
+  const n = getPeriodNumber(barId, periodId);
+  return 'Period ' + n;
+}
 function updateWeekLabel(){document.getElementById('currentWeekLabel').textContent='Week of '+getWeekLabel(document.getElementById('week-picker').value);}
 
 // ══════════════════════════════════════════════
@@ -1781,24 +1802,42 @@ function cancelPOSStaged() {
   showToast('POS file cancelled');
 }
 
-function confirmWeekSubmit() {
-  const week = document.getElementById('entry-week').value;
-  const start = parseFloat(document.getElementById('entry-start').value)||0;
-  const purchases = parseFloat(document.getElementById('entry-purchases').value)||0;
-  const end = parseFloat(document.getElementById('entry-end').value)||0;
-  const sales = parseFloat(document.getElementById('entry-sales').value)||0;
+function onPeriodDateChange() {
   const startDate = document.getElementById('entry-start-date').value||'';
-  const endDate = document.getElementById('entry-end-date').value||'';
+  const endDate   = document.getElementById('entry-end-date').value||'';
+  // Derive the hidden week/period ID from dates
+  if (startDate && endDate) {
+    document.getElementById('entry-week').value = startDate + '_' + endDate;
+    autoFillPurchases();
+  }
+  updatePosDateBanner();
+}
 
-  if (!week) { alert('Please select a week first.'); return; }
+function confirmWeekSubmit() {
+  if (activeBar==='combined'){showToast('Switch to a specific bar to add data',true);return;}
+  const startDate = document.getElementById('entry-start-date').value||'';
+  const endDate   = document.getElementById('entry-end-date').value||'';
+  const start   = parseFloat(document.getElementById('entry-start').value)||0;
+  const purchases = parseFloat(document.getElementById('entry-purchases').value)||0;
+  const end     = parseFloat(document.getElementById('entry-end').value)||0;
+  const sales   = parseFloat(document.getElementById('entry-sales').value)||0;
+
+  if (!startDate || !endDate) { alert('Please enter both Opening and Closing inventory count dates.'); return; }
   if (!sales) { alert('Please enter total sales before submitting.'); return; }
 
+  const periodId = startDate + '_' + endDate;
+  const periodNum = getPeriodNumber(activeBar, periodId);
   const cogs = start + purchases - end;
-  const pct = sales > 0 ? (cogs/sales)*100 : 0;
+  const pct  = sales > 0 ? (cogs/sales)*100 : 0;
 
-  // Build confirmation summary
+  // Required POS dates: start = opening count date, end = day BEFORE closing count date
+  const closingDate = new Date(endDate + 'T12:00:00');
+  const posEndDate  = new Date(closingDate); posEndDate.setDate(closingDate.getDate()-1);
+  const posEndStr   = posEndDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const posStartStr = new Date(startDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
   const lines = [
-    '📅  Week: ' + getWeekLabel(week),
+    'Period ' + periodNum + ': ' + posStartStr + ' → ' + posEndStr,
     '',
     '  Start Inventory:  ' + fmt$(start),
     '  + Purchases:      ' + fmt$(purchases),
@@ -1806,39 +1845,37 @@ function confirmWeekSubmit() {
     '  ─────────────────────',
     '  COGS:             ' + fmt$(cogs) + '  (' + pct.toFixed(1) + '%)',
     '  Total Sales:      ' + fmt$(sales),
-    '',
-    startDate ? '  Period Start: ' + startDate.replace('T',' ') : '',
-    endDate   ? '  Period End:   ' + endDate.replace('T',' ') : '',
-  ].filter(l => l !== undefined && !(l==='' && !startDate && !endDate)).join('\n');
+  ].join('\n');
 
-  if (confirm('CONFIRM WEEK SUBMISSION\n\n' + lines + '\n\nSubmit this entry?')) {
+  if (confirm('CONFIRM PERIOD SUBMISSION\n\n' + lines + '\n\nSubmit this entry?')) {
     addWeekEntry();
   }
 }
 
 function addWeekEntry(){
   if (activeBar==='combined'){showToast('Switch to a specific bar to add data',true);return;}
-  const week=document.getElementById('entry-week').value;
+  const startDate=document.getElementById('entry-start-date').value||'';
+  const endDate=document.getElementById('entry-end-date').value||'';
+  if(!startDate||!endDate){alert('Please enter both inventory count dates.');return;}
+  const week = startDate + '_' + endDate; // period ID
   const start=parseFloat(document.getElementById('entry-start').value)||0;
   const purchases=parseFloat(document.getElementById('entry-purchases').value)||0;
   const end=parseFloat(document.getElementById('entry-end').value)||0;
   const sales=parseFloat(document.getElementById('entry-sales').value)||0;
   const notes=document.getElementById('entry-notes').value;
-  const startDate=document.getElementById('entry-start-date').value||'';
-  const endDate=document.getElementById('entry-end-date').value||'';
   const salesSpirits=parseFloat(document.getElementById('entry-sales-spirits').value)||0;
   const salesBeer=parseFloat(document.getElementById('entry-sales-beer').value)||0;
   const salesWine=parseFloat(document.getElementById('entry-sales-wine').value)||0;
   const salesMixers=parseFloat(document.getElementById('entry-sales-mixers').value)||0;
-  if(!week){alert('Please select a week');return;}if(!sales){alert('Please enter sales');return;}
+  if(!sales){alert('Please enter sales');return;}
   const cogs=start+purchases-end,pct=sales>0?(cogs/sales)*100:0;
+  const periodNum = getPeriodNumber(activeBar, week);
   const entry={id:week,week,start,purchases,end,sales,cogs,pct,notes,startDate,endDate,
     salesSpirits,salesBeer,salesWine,salesMixers,synced:false};
   const idx=S().weeks.findIndex(w=>w.week===week);
-  if(idx>=0){if(confirm('Overwrite this week?'))S().weeks[idx]=entry;else return;}
+  if(idx>=0){if(confirm('Overwrite this period?'))S().weeks[idx]=entry;else return;}
   else S().weeks.push(entry);
   S().weeks.sort((a,b)=>a.week.localeCompare(b.week));
-  // Log submission
   if(!S().submissionLog) S().submissionLog=[];
   S().submissionLog.unshift({
     id: Date.now()+'',
@@ -1846,11 +1883,11 @@ function addWeekEntry(){
     submittedAt: new Date().toISOString(),
     bar: activeBar,
     filename: null,
-    summary: 'Week of '+getWeekLabel(week)+' · Sales: '+fmt$(sales)+' · COGS: '+fmt$(cogs),
+    summary: 'Period '+periodNum+' · '+getWeekLabel(week)+' · Sales: '+fmt$(sales)+' · COGS: '+fmt$(cogs),
     data: JSON.parse(JSON.stringify(entry))
   });
   saveLocal();renderWeeklyTable();renderDashboard();
-  showToast('✓ Week saved to '+BARS[activeBar].name);scheduleSync();
+  showToast('\u2713 Period '+periodNum+' saved to '+BARS[activeBar].name);scheduleSync();
   ['entry-start','entry-purchases','entry-end','entry-sales','entry-notes',
    'entry-sales-spirits','entry-sales-beer','entry-sales-wine','entry-sales-mixers'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('weekly-calc-preview').style.display='none';
@@ -1858,11 +1895,11 @@ function addWeekEntry(){
   if(hintEl) hintEl.textContent='Upload your Toast Sales Category report to auto-fill these fields';
   const purHintEl=document.getElementById('purchases-autofill-hint');
   if(purHintEl){ purHintEl.style.display='none'; purHintEl.textContent=''; }
-  if(endDate){
-    document.getElementById('entry-start-date').value=endDate;
-    document.getElementById('entry-end-date').value='';
-    updatePosDateBanner();
-  }
+  // Carry closing date forward as next opening date
+  document.getElementById('entry-start-date').value=endDate;
+  document.getElementById('entry-end-date').value='';
+  document.getElementById('entry-week').value='';
+  updatePosDateBanner();
 }
 
 function deleteWeek(week){
@@ -1874,7 +1911,7 @@ function deleteWeek(week){
 function renderWeeklyTable(){
   const tbody=document.getElementById('weekly-table-body'),weeks=S().weeks;
   if(!weeks.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">No entries yet</td></tr>';return;}
-  tbody.innerHTML=[...weeks].reverse().map(w=>`<tr><td>${getWeekLabel(w.week)}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${escHtml(w.notes||'')}</td><td>${syncChip(w.synced)}</td><td><button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deleteWeek('${w.week}')">✕</button></td></tr>`).join('');
+  const sortedW=[...weeks].sort((a,b)=>a.week.localeCompare(b.week));tbody.innerHTML=[...sortedW].reverse().map((w,i)=>`<tr><td>Period ${sortedW.length-i}</td><td>${getWeekLabel(w.week)}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${escHtml(w.notes||'')}</td><td>${syncChip(w.synced)}</td><td><button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deleteWeek('${w.week}')">✕</button></td></tr>`).join('');
 }
 
 // ══════════════════════════════════════════════
@@ -2252,8 +2289,9 @@ function renderDashboard(){
 function calcCogsStats(weeks){
   const now=new Date(),thisMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const latest=weeks[weeks.length-1];
-  const mw=weeks.filter(w=>{try{const [y,wk]=w.week.split('-W');const d=new Date(+y,0,1+(parseInt(wk)-1)*7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')===thisMonth;}catch(e){return false;}});
-  const yw=weeks.filter(w=>w.week.startsWith(now.getFullYear()+'-'));
+  const getPeriodStartDate = w => { if(w.week.includes('_')) return w.week.split('_')[0]; try{const [y,wk]=w.week.split('-W');const d=new Date(+y,0,1+(parseInt(wk)-1)*7);return d.toISOString().slice(0,10);}catch(e){return '';} };
+  const mw=weeks.filter(w=>{ try{ const s=getPeriodStartDate(w); const d=new Date(s+'T12:00:00'); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')===thisMonth; }catch(e){return false;} });
+  const yw=weeks.filter(w=>{ try{ const s=getPeriodStartDate(w); return s.startsWith(now.getFullYear()+''); }catch(e){return false;} });
   return {
     latest, weekPct:latest?latest.pct:null, weekSales:latest?latest.sales:null,
     monthPct:mw.length?(mw.reduce((s,w)=>s+w.cogs,0)/mw.reduce((s,w)=>s+w.sales,0))*100:null,
@@ -2266,16 +2304,16 @@ function renderSingleDashboard(){
   const weeks=S().weeks,st=calcCogsStats(weeks);
   const set=(id,val,cls)=>{const el=document.getElementById(id);el.textContent=val;if(cls)el.className='stat-value '+cls;};
   set('dash-weekly-cogs', st.weekPct!==null?fmtPct(st.weekPct):'—', st.weekPct!==null?cogsClass(st.weekPct):null);
-  document.getElementById('dash-weekly-sub').textContent=st.latest?getWeekLabel(st.latest.week):'No data yet';
+  document.getElementById('dash-weekly-sub').textContent=st.latest?getWeekLabel(st.latest.week):'No data yet — save a period first';
   set('dash-monthly-cogs', st.monthPct!==null?fmtPct(st.monthPct):'—', st.monthPct!==null?cogsClass(st.monthPct):null);
   document.getElementById('dash-monthly-sub').textContent=st.monthWeeks?st.monthWeeks+' week(s) this month':'No data this month';
   set('dash-yearly-cogs', st.yearPct!==null?fmtPct(st.yearPct):'—', st.yearPct!==null?cogsClass(st.yearPct):null);
   document.getElementById('dash-yearly-sub').textContent=st.yearWeeks?st.yearWeeks+' week(s) this year':'No data this year';
   set('dash-sales', st.weekSales!==null?fmt$(st.weekSales):'—', null);
-  document.getElementById('dash-sales-sub').textContent=st.latest?getWeekLabel(st.latest.week):'No data yet';
+  document.getElementById('dash-sales-sub').textContent=st.latest?'Latest period':'No data yet — save a period first';
   const hbody=document.getElementById('history-table-body');
   if(!weeks.length){hbody.innerHTML='<tr><td colspan="8" class="empty-state">No data yet</td></tr>';return;}
-  hbody.innerHTML=[...weeks].reverse().slice(0,8).map(w=>`<tr><td>${getWeekLabel(w.week)}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${cogsBadge(w.pct)}</td></tr>`).join('');
+  hbody.innerHTML=[...weeks].reverse().slice(0,8).map((w,i,arr)=>`<tr><td>Period ${weeks.length-i}</td><td>${getWeekLabel(w.week)}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${cogsBadge(w.pct)}</td></tr>`).join('');
 }
 
 function renderCombinedDashboard(){
@@ -2320,7 +2358,7 @@ function renderHistory(){
   const weeks=activeBar==='combined'?getWeeksList():S().weeks;
   const ab=document.getElementById('all-weeks-body');
   if(!weeks.length){ab.innerHTML='<tr><td colspan="9" class="empty-state">No history yet</td></tr>';}
-  else ab.innerHTML=[...weeks].reverse().map(w=>`<tr><td>${getWeekLabel(w.week)}${w.bar?` <span class="badge badge-${w.bar}" style="font-size:9px;">${w.bar==='dh'?'DH':'LH'}</span>`:''}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${cogsBadge(w.pct)}</td><td>${escHtml(w.notes||'—')}</td></tr>`).join('');
+  else { const sw=[...weeks].sort((a,b)=>a.week.localeCompare(b.week)); ab.innerHTML=[...sw].reverse().map((w,i)=>`<tr><td>Period ${sw.length-i}${w.bar?` <span class="badge badge-${w.bar}" style="font-size:9px;">${w.bar==='dh'?'DH':'LH'}</span>`:''}</td><td>${getWeekLabel(w.week)}</td><td class="num">${fmt$(w.start)}</td><td class="num">${fmt$(w.purchases)}</td><td class="num">${fmt$(w.end)}</td><td class="num">${fmt$(w.cogs)}</td><td class="num">${fmt$(w.sales)}</td><td class="num ${cogsClass(w.pct)}">${fmtPct(w.pct)}</td><td>${cogsBadge(w.pct)}</td><td>${escHtml(w.notes||'—')}</td></tr>`).join(''); }
   const byMonth={},byYear={};
   weeks.forEach(w=>{try{const [y,wk]=w.week.split('-W');const d=new Date(+y,0,1+(parseInt(wk)-1)*7);const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),ml=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});if(!byMonth[mk])byMonth[mk]={label:ml,cogs:0,sales:0};byMonth[mk].cogs+=w.cogs;byMonth[mk].sales+=w.sales;const yr=w.week.split('-W')[0];if(!byYear[yr])byYear[yr]={cogs:0,sales:0};byYear[yr].cogs+=w.cogs;byYear[yr].sales+=w.sales;}catch(e){}});
   document.getElementById('monthly-breakdown').innerHTML=Object.values(byMonth).reverse().map(m=>{const p=m.sales>0?(m.cogs/m.sales)*100:0;return`<div class="chart-row"><div class="chart-label">${m.label.split(' ')[0]}</div><div class="chart-bar-wrap"><div class="chart-bar ${cogsClass(p)}" style="width:${Math.min(p*2,100)}%">${fmtPct(p)}</div></div></div>`;}).join('')||'<div class="empty-state">No data</div>';
@@ -3450,29 +3488,43 @@ function submitInventory(type) {
 function handlePOSUpload(input){
   const file=input.files[0];if(!file)return;
 
-  // Extract date range from filename and check for overlaps
   const { startDate, endDate } = extractDateRangeFromFilename(file.name);
+
+  // Hard-block: validate POS dates against inventory count dates if both are set
+  const invStart = (document.getElementById('entry-start-date')?.value||'').slice(0,10);
+  const invEnd   = (document.getElementById('entry-end-date')?.value||'').slice(0,10);
+
+  if (invStart && invEnd && startDate && endDate) {
+    const requiredEnd = new Date(invEnd+'T12:00:00');
+    requiredEnd.setDate(requiredEnd.getDate()-1);
+    const requiredEndStr   = requiredEnd.toISOString().slice(0,10);
+    const fmtD = s => new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    if (startDate !== invStart || endDate !== requiredEndStr) {
+      alert(
+        '\u26d4 INCORRECT POS REPORT DATES\n\n' +
+        'This report covers ' + fmtD(startDate) + ' \u2192 ' + fmtD(endDate) + '\n\n' +
+        'Based on your inventory dates, your POS report must cover all sales that\n' +
+        'occurred before your closing inventory count.\n\n' +
+        'Please rerun your POS report starting ' + fmtD(invStart) +
+        ' and ending ' + fmtD(requiredEndStr) +
+        ' (the day before your ' + fmtD(invEnd) + ' closing count).\n\n' +
+        'Tip: if you count inventory during the day before sales begin, your\n' +
+        'last sales day should be the day before your closing count date.'
+      );
+      input.value=''; return;
+    }
+  }
+
   if (startDate) {
     const overlap = checkPOSDateOverlap(startDate, endDate);
     if (overlap) {
-      const overlapWeek = getWeekLabel(overlap.week);
-      const rangeStr = endDate ? `${startDate} to ${endDate}` : `starting ${startDate}`;
       const proceed = confirm(
-        `⚠️ DATE OVERLAP DETECTED\n\n` +
-        `This file covers ${rangeStr}\n` +
-        `but week "${overlapWeek}" already has POS data for overlapping dates.\n\n` +
-        `Importing this could double-count sales.\n\nProceed anyway?`
+        `\u26a0\ufe0f DATE OVERLAP DETECTED\n\nThis file overlaps with period "${getWeekLabel(overlap.week)}" which already has POS data.\n\nImporting could double-count sales. Proceed anyway?`
       );
       if (!proceed) { input.value=''; return; }
     }
-    // Auto-fill start/end date fields from filename
-    const startEl = document.getElementById('entry-start-date');
-    const endEl = document.getElementById('entry-end-date');
-    if (startEl && !startEl.value) startEl.value = startDate + 'T00:00';
-    if (endEl && endDate) endEl.value = endDate + 'T23:59';
     updatePosDateBanner();
-    const rangeStr = endDate ? `${startDate} → ${endDate}` : startDate;
-    showToast(`📅 Date range detected: ${rangeStr}`);
+    showToast('\ud83d\udcc5 Date range detected: ' + startDate + ' \u2192 ' + (endDate||'?'));
   }
 
   const reader=new FileReader();
@@ -3899,6 +3951,8 @@ function resubmitWeeklyEntry(i) {
   if(d.salesMixers) document.getElementById('entry-sales-mixers').value = d.salesMixers;
   if(d.startDate) document.getElementById('entry-start-date').value = d.startDate;
   if(d.endDate) document.getElementById('entry-end-date').value = d.endDate;
+  if(d.startDate && d.endDate) document.getElementById('entry-week').value = d.startDate+'_'+d.endDate;
+  onPeriodDateChange();
   updatePreview();
   switchTab('weekly');
   showToast('✓ Weekly entry loaded — review and click SAVE WEEK');
@@ -4689,20 +4743,25 @@ function restoreLatestPOS() {
 function tryCarryForward() {
   if (activeBar==='combined') return;
   const weeks = S().weeks;
-  if (!weeks.length) { updatePosDateBanner(); return; }
-  const lastWeek = weeks[weeks.length-1];
+  updatePosDateBanner();
+  if (!weeks.length) return;
+  const lastPeriod = [...weeks].sort((a,b)=>a.week.localeCompare(b.week)).slice(-1)[0];
+
+  // Carry forward closing inventory value as new opening value
   const entryStartEl = document.getElementById('entry-start');
   const hintEl = document.getElementById('carry-forward-hint');
-  if (entryStartEl && (!entryStartEl.value || parseFloat(entryStartEl.value)===0)) {
-    entryStartEl.value = lastWeek.end.toFixed(2);
+  if (entryStartEl && (!entryStartEl.value || parseFloat(entryStartEl.value)===0) && lastPeriod.end) {
+    entryStartEl.value = lastPeriod.end.toFixed(2);
     if (hintEl) hintEl.style.display = 'block';
     updatePreview();
   }
+
+  // Carry forward closing count date as new opening count date
   const startDateEl = document.getElementById('entry-start-date');
-  if (startDateEl && !startDateEl.value && lastWeek.endDate) {
-    startDateEl.value = lastWeek.endDate;
+  if (startDateEl && !startDateEl.value && lastPeriod.endDate) {
+    startDateEl.value = lastPeriod.endDate;
+    updatePosDateBanner();
   }
-  updatePosDateBanner();
 }
 
 // ══════════════════════════════════════════════
@@ -4717,27 +4776,29 @@ function updatePosDateBanner() {
   const startVal = document.getElementById('entry-start-date')?.value;
   const endVal   = document.getElementById('entry-end-date')?.value;
 
-  const fmtDT = (val) => {
+  const fmtDate = (val) => {
     if (!val) return null;
-    const d = new Date(val);
+    const d = new Date(val+'T12:00:00');
     if (isNaN(d)) return null;
-    return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) +
-      ' at ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
   };
 
-  const startFmt = fmtDT(startVal);
-  const endFmt   = fmtDT(endVal);
+  if (startVal && endVal) {
+    // POS report must start on opening count date and end day BEFORE closing count date
+    const closingDate = new Date(endVal+'T12:00:00');
+    const posEnd = new Date(closingDate); posEnd.setDate(closingDate.getDate()-1);
+    const posEndStr   = posEnd.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    const posStartStr = fmtDate(startVal);
 
-  if (startFmt && endFmt) {
     banner.style.display = 'block';
-    rangeEl.textContent  = startFmt + '  →  ' + endFmt;
-    subEl.textContent    = 'Run your POS report for exactly this date/time range';
+    rangeEl.textContent  = posStartStr + '  →  ' + posEndStr;
+    subEl.textContent    = 'Your POS report must start ' + posStartStr + ' and end ' + posEndStr + ' (the day before your closing inventory count)';
     banner.style.background   = 'rgba(39,174,96,0.08)';
     banner.style.borderColor  = 'rgba(39,174,96,0.3)';
-  } else if (startFmt && !endFmt) {
+  } else if (startVal && !endVal) {
     banner.style.display = 'block';
-    rangeEl.textContent  = startFmt + '  →  ??? (end count not yet entered)';
-    subEl.textContent    = 'Enter your end count date/time above to see the full POS range';
+    rangeEl.textContent  = fmtDate(startVal) + '  →  ??? (enter closing count date)';
+    subEl.textContent    = 'Enter your closing inventory count date to see the required POS date range';
     banner.style.background  = 'rgba(212,168,67,0.08)';
     banner.style.borderColor = 'rgba(212,168,67,0.3)';
   } else {
@@ -4751,21 +4812,9 @@ function updatePosDateBanner() {
 function autoFillPurchases() {
   if (activeBar==='combined') { showToast('Switch to a specific bar first', true); return; }
 
-  const weekVal = document.getElementById('entry-week').value;
-  if (!weekVal) { showToast('Select a week first', true); return; }
-
-  // Get the Monday–Sunday date range for the selected week
-  const [y, wk] = weekVal.split('-W');
-  const jan1 = new Date(+y, 0, 1);
-  // ISO week: find the Monday of the given week
-  const dayOfWeek = jan1.getDay() || 7; // 1=Mon...7=Sun
-  const weekStart = new Date(jan1);
-  weekStart.setDate(jan1.getDate() + (parseInt(wk) - 1) * 7 - (dayOfWeek - 1));
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-
-  const startStr = weekStart.toISOString().slice(0, 10);
-  const endStr   = weekEnd.toISOString().slice(0, 10);
+  const startStr = document.getElementById('entry-start-date').value||'';
+  const endStr   = document.getElementById('entry-end-date').value||'';
+  if (!startStr || !endStr) { return; } // silently skip if dates not set yet
 
   // Sum all purchases whose date falls within this week
   const purchases = S().purchases || [];
