@@ -5842,43 +5842,37 @@ function parseModifierDetailCSV(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return null;
   const headers = parseCsvLine(lines[0]).map(h => h.replace(/"/g,'').toLowerCase().trim());
+
+  // Actual Toast export columns: Modifier, Parent Menu Selection, Net Price, Qty
+  // (no Option Group Name or Void? columns in this export format)
   const colMod    = headers.findIndex(h => h === 'modifier');
-  const colGroup  = headers.findIndex(h => h.includes('option group') || h.includes('group name'));
   const colParent = headers.findIndex(h => h.includes('parent'));
   const colQty    = headers.findIndex(h => h === 'qty');
-  const colVoid   = headers.findIndex(h => h.includes('void') && !h.includes('reason'));
   if (colMod < 0 || colParent < 0 || colQty < 0) return null;
 
   // Normalise size modifier text → oz
   const modToOz = t => {
     t = (t||'').toLowerCase().trim();
     const m = t.match(/^(\d+(?:\.\d+)?)\s*oz/); if (m) return parseFloat(m[1]);
+    if (/^(\d+(?:\.\d+)?)\s*oz/.test(t)) return parseFloat(t);
     if (/^double/.test(t)) return 2.0;
     if (/^triple/.test(t)) return 3.0;
-    if (/margarita|martini|sour|cosmopolitan|manhattan|negroni/.test(t)) return 1.5;
     return null;
   };
 
   const bySpirit = {};
   for (let i = 1; i < lines.length; i++) {
     const row = parseCsvLine(lines[i]);
-    if (!row || row.length < 4) continue;
+    if (!row || row.length < 3) continue;
     const modifier = (row[colMod]||'').replace(/"/g,'').trim();
-    const group    = colGroup >= 0 ? (row[colGroup]||'').replace(/"/g,'').trim() : '';
     const parent   = (row[colParent]||'').replace(/"/g,'').trim();
     const qty      = parseFloat((row[colQty]||'0').replace(/"/g,''))||0;
-    const isVoid   = colVoid >= 0 ? (row[colVoid]||'').replace(/"/g,'').toLowerCase()==='true' : false;
-    if (isVoid || qty <= 0 || !parent) continue;
+    if (qty <= 0 || !parent || !modifier) continue;
 
-    const isSizeGroup  = group.toLowerCase() === 'size';
-    const isDrinkMod   = group.toLowerCase().includes('drink modifier') || group.toLowerCase().includes('$ drink');
-    if (!isSizeGroup && !isDrinkMod) continue;
-
+    // Only process rows where the modifier looks like a pour size
     const oz = modToOz(modifier);
     if (!oz) continue;
 
-    // Skip cocktail/menu item parents — modifier detail only tracks direct spirit pours
-    // A direct spirit pour parent = something in the Items.csv Liquor category (matched later)
     const k = parent.toLowerCase().trim();
     if (!bySpirit[k]) bySpirit[k] = { name: parent, totalOz: 0, breakdown: [], hasData: true };
     bySpirit[k].totalOz += oz * qty;
@@ -5977,30 +5971,50 @@ function validateVariancePair() {
 
   const match = hasItems && hasMods ? dateRangesMatch(d.itemsRange, d.modifiersRange) : null;
 
+  // Also check against current period dates
+  const startVal = document.getElementById('entry-start-date')?.value;
+  const endVal   = document.getElementById('entry-end-date')?.value;
+  let periodWarning = '';
+  if (startVal && endVal && (hasItems || hasMods)) {
+    const closingDate = new Date(endVal+'T12:00:00');
+    const posEnd = new Date(closingDate); posEnd.setDate(closingDate.getDate()-1);
+    const expectedStart = startVal; // YYYY-MM-DD
+    const expectedEnd   = posEnd.toISOString().slice(0,10); // YYYY-MM-DD
+    const fileRange = d.modifiersRange || d.itemsRange;
+    if (fileRange) {
+      const norm = s => s ? s.replace(/[_\/]/g,'-').trim() : '';
+      const fileStart = norm(fileRange.start);
+      const fileEnd   = norm(fileRange.end);
+      if (fileStart !== expectedStart || fileEnd !== expectedEnd) {
+        periodWarning = `<br><span style="font-size:11px;">⚠ File dates (${fileRange.raw}) don't match your period (${expectedStart} → ${expectedEnd}). Re-export from Toast for the correct range.</span>`;
+      }
+    }
+  }
+
   if (hasItems && hasMods && match !== false) {
     banner.style.display = 'block';
-    banner.style.background = 'rgba(39,174,96,0.1)';
-    banner.style.border = '1px solid rgba(39,174,96,0.3)';
-    banner.style.color = '#27ae60';
-    banner.innerHTML = `✓ Both files loaded${d.itemsRange ? ` · ${d.itemsRange.raw}` : ''} — ready for variance report`;
+    banner.style.background = periodWarning ? 'rgba(192,132,26,0.1)' : 'rgba(39,174,96,0.1)';
+    banner.style.border = periodWarning ? '1px solid rgba(192,132,26,0.3)' : '1px solid rgba(39,174,96,0.3)';
+    banner.style.color = periodWarning ? '#c0841a' : '#27ae60';
+    banner.innerHTML = `✓ Both files loaded${d.itemsRange ? ` · ${d.itemsRange.raw}` : ''} — ready for variance report${periodWarning}`;
   } else if (hasItems && hasMods && match === false) {
     banner.style.display = 'block';
     banner.style.background = 'rgba(192,57,43,0.1)';
     banner.style.border = '1px solid rgba(192,57,43,0.3)';
     banner.style.color = '#e74c3c';
-    banner.innerHTML = `⚠ DATE RANGE MISMATCH — Items: ${d.itemsRange?.raw||'unknown'} &nbsp;·&nbsp; Modifiers: ${d.modifiersRange?.raw||'unknown'}<br>Variance will be inaccurate. Make sure both reports cover the same period.`;
+    banner.innerHTML = `⚠ DATE RANGE MISMATCH — Items: ${d.itemsRange?.raw||'unknown'} &nbsp;·&nbsp; Modifiers: ${d.modifiersRange?.raw||'unknown'}<br>Variance will be inaccurate. Make sure both reports cover the same period.${periodWarning}`;
   } else if (hasItems && !hasMods) {
     banner.style.display = 'block';
     banner.style.background = 'rgba(192,132,26,0.1)';
     banner.style.border = '1px solid rgba(192,132,26,0.3)';
     banner.style.color = '#c0841a';
-    banner.innerHTML = `⚠ Missing Modifier Detail — direct spirit pours will use ${DEFAULT_POUR_OZ}oz default (estimated). Upload Modifier Detail for exact oz tracking.`;
+    banner.innerHTML = `⚠ Missing Modifier Detail — direct spirit pours will use ${DEFAULT_POUR_OZ}oz default (estimated). Upload Modifier Detail for exact oz tracking.${periodWarning}`;
   } else if (!hasItems && hasMods) {
     banner.style.display = 'block';
     banner.style.background = 'rgba(192,132,26,0.1)';
     banner.style.border = '1px solid rgba(192,132,26,0.3)';
     banner.style.color = '#c0841a';
-    banner.innerHTML = `⚠ Missing Product Mix (Items.csv) — cocktail and beer sales unavailable.`;
+    banner.innerHTML = `⚠ Missing Product Mix (Items.csv) — cocktail and beer sales unavailable.${periodWarning}`;
   }
 }
 
