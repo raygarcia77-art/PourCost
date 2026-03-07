@@ -6,6 +6,7 @@
 <title>PourCost — Multi-Bar COGS Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root {
   --bg:#0e0e0e; --surface:#161616; --surface2:#1e1e1e; --border:#2a2a2a;
@@ -5952,8 +5953,9 @@ function handleAllLevelsUpload(input) {
           const text = await entry.async('string');
           processText(text, file.name);
         } catch(err) {
-          statusEl.textContent = '⚠ Could not read zip file';
-          showToast('Could not read zip', true);
+          console.error('JSZip error:', err);
+          statusEl.textContent = '⚠ Could not read zip: ' + (err.message||'unknown error');
+          showToast('Could not read zip — check console for details', true);
         }
       };
       reader.readAsArrayBuffer(file);
