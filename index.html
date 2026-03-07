@@ -5816,6 +5816,7 @@ function parseAllLevelsCSV(text) {
   const colCat     = ci('sales category');   // present in standalone CSV export
   const colMenu    = headers.indexOf('menu'); // present in zip export
   const colGroup   = ci('menu group');        // present in zip export
+  const colNet     = ci('net sales');
   if (colType < 0 || colName < 0 || colQty < 0) return null;
 
   // Derive sales category from either the Sales Category column or Menu/Menu group
@@ -5857,7 +5858,7 @@ function parseAllLevelsCSV(text) {
     if (!name) continue;
 
     if (type === 'menuItem') {
-      items[name] = { salesCat: getSalesCat(row), qtySold: qty };
+      items[name] = { salesCat: getSalesCat(row), qtySold: qty, netSales: colNet >= 0 ? (parseFloat((row[colNet]||'0').replace(/"/g,''))||0) : 0 };
     } else if (type === 'sizedModifier' && sizeMod) {
       const oz = modToOz(sizeMod);
       if (!oz || qty <= 0) continue;
@@ -5897,14 +5898,37 @@ function handleAllLevelsUpload(input) {
     S().productMixData.modifiersRange = dateRange;
     S().productMixData.allLevelsAt    = new Date().toISOString();
     saveLocal();
+
+    // Auto-fill sales fields from net sales totals by category
+    const salesTotals = { liquor:0, draftBeer:0, bottledBeer:0, wine:0, food:0, other:0 };
+    Object.values(result.items).forEach(item => {
+      const net = item.netSales || 0;
+      switch(item.salesCat) {
+        case 'Liquor':       salesTotals.liquor     += net; break;
+        case 'Draft Beer':   salesTotals.draftBeer  += net; break;
+        case 'Bottled Beer': salesTotals.bottledBeer+= net; break;
+        case 'Wine':         salesTotals.wine       += net; break;
+        case 'Food':         salesTotals.food       += net; break;
+        default:             salesTotals.other      += net; break;
+      }
+    });
+    const totalBeer    = salesTotals.draftBeer + salesTotals.bottledBeer;
+    const totalSales   = salesTotals.liquor + totalBeer + salesTotals.wine + salesTotals.food + salesTotals.other;
+    const setField = (id, val) => { const el = document.getElementById(id); if (el && val > 0) el.value = val.toFixed(2); };
+    setField('entry-sales',         totalSales);
+    setField('entry-sales-spirits', salesTotals.liquor);
+    setField('entry-sales-beer',    totalBeer);
+    setField('entry-sales-wine',    salesTotals.wine);
+    updatePreview();
+
     const liquor  = Object.values(result.items).filter(v => v.salesCat === 'Liquor').length;
     const beer    = Object.values(result.items).filter(v => ['Draft Beer','Bottled Beer'].includes(v.salesCat)).length;
     const spirits = Object.keys(result.modifiers).length;
     const totalOz = Object.values(result.modifiers).reduce((s,v) => s + v.totalOz, 0);
-    statusEl.textContent = `✓ ${liquor} liquor · ${beer} beer · ${spirits} spirits w/ pour data (${totalOz.toFixed(1)} oz)`;
+    statusEl.textContent = `✓ ${liquor} liquor · ${beer} beer · ${spirits} spirits w/ pour data (${totalOz.toFixed(1)} oz) · Sales: $${totalSales.toFixed(0)} auto-filled`;
     document.getElementById('upload-all-levels').classList.add('loaded');
     validateVariancePair();
-    showToast(`✓ All Levels loaded — ${liquor + beer} beverage items, ${spirits} spirits tracked`);
+    showToast(`✓ All Levels loaded — sales auto-filled: Liquor $${salesTotals.liquor.toFixed(0)} · Beer $${totalBeer.toFixed(0)} · Wine $${salesTotals.wine.toFixed(0)}`);
   };
 
   if (file.name.toLowerCase().endsWith('.zip')) {
