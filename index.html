@@ -183,6 +183,24 @@ input::placeholder{color:var(--muted);}
 .unmatched-chip{background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.3);border-radius:4px;padding:4px 10px;font-family:var(--mono);font-size:11px;color:var(--accent2);cursor:pointer;display:inline-block;margin:3px;}
 .suggest-chip{background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.25);border-radius:4px;padding:4px 10px;font-family:var(--mono);font-size:11px;color:var(--accent);cursor:pointer;display:inline-block;margin:3px;}
 
+/* ── INVENTORY VALUATION ── */
+.inv-val-modal{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:26px;width:min(900px,96vw);max-height:92vh;overflow-y:auto;}
+.inv-val-row{display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1.2fr 90px;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;}
+.inv-val-row:hover{background:rgba(255,255,255,0.02);}
+.inv-val-header{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:6px 12px;background:var(--surface2);}
+.inv-val-name{font-size:12px;}
+.inv-val-match{font-size:10px;color:var(--green);margin-top:1px;}
+.inv-val-unmatched{color:var(--accent2);font-size:10px;margin-top:1px;}
+.inv-match-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;font-size:10px;font-family:var(--mono);}
+.inv-match-pill.matched{background:rgba(39,174,96,0.1);color:var(--green);border:1px solid rgba(39,174,96,0.25);}
+.inv-match-pill.guessed{background:rgba(212,168,67,0.1);color:var(--accent);border:1px solid rgba(212,168,67,0.25);}
+.inv-match-pill.unmatched{background:rgba(192,57,43,0.1);color:var(--accent2);border:1px solid rgba(192,57,43,0.25);}
+.inv-val-total-row{display:flex;justify-content:flex-end;align-items:center;gap:24px;padding:14px 12px;background:var(--surface2);border-top:2px solid var(--accent);font-family:var(--mono);font-size:13px;}
+.upload-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+.inv-section-badge{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:1.5px;padding:2px 7px;border-radius:3px;margin-left:8px;vertical-align:middle;}
+.inv-section-badge.liquor{background:rgba(212,168,67,0.15);color:var(--accent);}
+.inv-section-badge.draft{background:rgba(41,128,185,0.15);color:#2980b9;}
+
 /* ── MODALS ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:400;align-items:center;justify-content:center;}
 .modal-overlay.show{display:flex;}
@@ -532,17 +550,26 @@ input::placeholder{color:var(--muted);}
         <div class="section-title">WEEKLY DATA ENTRY — <span id="weekly-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
         <input type="week" id="week-picker" style="width:auto" onchange="updateWeekLabel();autoFillPurchases()">
       </div>
-      <div class="upload-grid">
+      <div class="upload-grid-4">
         <div>
-          <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="start-status"></div></div>
+          <div class="upload-box" id="upload-start"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'start')"><div class="upload-icon">📋</div><div class="upload-title">Start Liquor Inventory</div><div class="upload-hint">xlsx — Col A: name, Col F: total</div><div class="upload-status" id="start-status"></div></div>
           <button class="btn btn-primary" id="submit-start-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitInventory('start')">✓ Submit Start Inventory</button>
         </div>
         <div>
-          <div class="upload-box" id="upload-end"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'end')"><div class="upload-icon">📋</div><div class="upload-title">End of Week Inventory</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="end-status"></div></div>
+          <div class="upload-box" id="upload-end"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleInventoryUpload(this,'end')"><div class="upload-icon">📋</div><div class="upload-title">End Liquor Inventory</div><div class="upload-hint">xlsx — Col A: name, Col F: total</div><div class="upload-status" id="end-status"></div></div>
           <button class="btn btn-primary" id="submit-end-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitInventory('end')">✓ Submit End Inventory</button>
         </div>
         <div>
-          <div class="upload-box" id="upload-pos"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div class="upload-icon">🖥️</div><div class="upload-title">POS Sales Data</div><div class="upload-hint">CSV or Excel</div><div class="upload-status" id="pos-status"></div></div>
+          <div class="upload-box" id="upload-start-keg"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleKegInventoryUpload(this,'start')"><div class="upload-icon">🍺</div><div class="upload-title">Start Draft/Keg Inventory</div><div class="upload-hint">xlsx — decimals = fill level</div><div class="upload-status" id="start-keg-status"></div></div>
+          <button class="btn btn-primary" id="submit-start-keg-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitKegInventory('start')">✓ Submit Start Keg Inventory</button>
+        </div>
+        <div>
+          <div class="upload-box" id="upload-end-keg"><input type="file" accept=".csv,.xlsx,.xls" onchange="handleKegInventoryUpload(this,'end')"><div class="upload-icon">🍺</div><div class="upload-title">End Draft/Keg Inventory</div><div class="upload-hint">xlsx — decimals = fill level</div><div class="upload-status" id="end-keg-status"></div></div>
+          <button class="btn btn-primary" id="submit-end-keg-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitKegInventory('end')">✓ Submit End Keg Inventory</button>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+          <div class="upload-box" id="upload-pos" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:14px;padding:16px 20px;"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div style="font-size:24px;">🖥️</div><div><div class="upload-title">POS Sales Data</div><div class="upload-hint">Toast CSV export</div><div class="upload-status" id="pos-status"></div></div></div>
           <div id="pos-staged-preview" style="display:none;background:var(--surface);border:1px solid rgba(212,168,67,0.3);border-radius:0 0 6px 6px;padding:10px 12px;margin-top:-2px;font-family:var(--mono);font-size:11px;">
             <div id="pos-staged-content" style="color:var(--muted);margin-bottom:8px;line-height:1.8;"></div>
             <div style="display:flex;gap:8px;">
@@ -551,7 +578,6 @@ input::placeholder{color:var(--muted);}
             </div>
           </div>
         </div>
-      </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title">PERIOD ENTRY</div></div>
       <div id="sb-weekly-form">
@@ -1102,6 +1128,7 @@ input::placeholder{color:var(--muted);}
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" onclick="pullFromSheets()">↓ Pull Latest from Google Sheets</button>
         <button class="btn btn-outline" onclick="pushAllToSheets()">↑ Push All Local Data to Sheets</button>
+        <button class="btn btn-outline" onclick="showInvMappingsInfo()">📦 View Inventory Mappings</button>
         <button class="btn btn-danger" onclick="clearLocalData()">⚠ Clear Local Cache</button>
       </div>
       <hr class="divider">
@@ -1253,6 +1280,46 @@ Return only the JSON array.</textarea>
 <div class="toast" id="toast"></div>
 
 <!-- ═══════════════════════════════════
+     INVENTORY VALUATION MODAL
+═══════════════════════════════════ -->
+<div class="modal-overlay" id="inv-val-modal-overlay" style="display:none;align-items:flex-start;padding-top:40px;">
+  <div class="inv-val-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="modal-title" id="inv-val-modal-title">INVENTORY VALUATION</div>
+      <button onclick="closeInvValModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div class="modal-sub" id="inv-val-modal-sub">Matching inventory items to price history...</div>
+
+    <!-- Stats bar -->
+    <div style="display:flex;gap:20px;margin-bottom:18px;flex-wrap:wrap;">
+      <div style="font-family:var(--mono);font-size:11px;"><span style="color:var(--green);" id="inv-val-matched-count">0</span> <span style="color:var(--muted);">matched</span></div>
+      <div style="font-family:var(--mono);font-size:11px;"><span style="color:var(--accent);" id="inv-val-guessed-count">0</span> <span style="color:var(--muted);">auto-guessed</span></div>
+      <div style="font-family:var(--mono);font-size:11px;"><span style="color:var(--accent2);" id="inv-val-unmatched-count">0</span> <span style="color:var(--muted);">no price found</span></div>
+      <div style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">Click any cost cell to override</div>
+    </div>
+
+    <!-- Table -->
+    <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:16px;">
+      <div class="inv-val-row inv-val-header">
+        <div>PRODUCT</div><div style="text-align:right;">TOTAL</div><div style="text-align:right;">UNIT COST</div><div style="text-align:right;">VALUE</div><div>MATCH</div><div></div>
+      </div>
+      <div id="inv-val-rows" style="max-height:400px;overflow-y:auto;"></div>
+      <div class="inv-val-total-row">
+        <span style="color:var(--muted);">TOTAL INVENTORY VALUE</span>
+        <span style="font-family:var(--display);font-size:24px;color:var(--accent);" id="inv-val-grand-total">$0.00</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-right:auto;" id="inv-val-action-hint">Review matches above, then apply to populate inventory value.</div>
+      <button class="btn btn-outline" onclick="closeInvValModal()">Cancel</button>
+      <button class="btn btn-primary" id="inv-val-apply-btn" onclick="applyInvValuation()">✓ Apply to <span id="inv-val-apply-label">Start</span> Inventory $</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
      JAVASCRIPT
 ═══════════════════════════════════ -->
 <script>
@@ -1268,7 +1335,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[] };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{} };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -1451,7 +1518,7 @@ function getSheetNames(barId) {
   return {
     WEEKS:`${p}Weeks`, PURCHASES:`${p}Purchases`, PRICE_HISTORY:`${p}PriceHistory`,
     PRODUCT_MAPS:`${p}ProductMaps`, POS_ITEMS:`${p}PosItems`, MENU_ITEMS:`${p}MenuItems`,
-    WASTE_LOGS:`${p}WasteLogs`, DEPLETIONS:`${p}Depletions`
+    WASTE_LOGS:`${p}WasteLogs`, DEPLETIONS:`${p}Depletions`, INV_MAPPINGS:`${p}InvMappings`
   };
 }
 
@@ -1486,6 +1553,8 @@ async function pushBarToSheets(barId) {
   await gasWrite(SN.MENU_ITEMS,[hMI,...(st.menuItems||[]).map(m=>[m.id,m.name,m.cat,m.sellPrice,m.avgWeeklyUnits,JSON.stringify(m.ingredients)])]);
   await gasWrite(SN.WASTE_LOGS,[hWL,...(st.wasteLogs||[]).map(l=>[l.id,l.date,l.type,l.item,l.qty,l.value,l.reason||''])]);
   await gasWrite(SN.DEPLETIONS,[hD,...(st.depletions||[]).map(d=>[d.id,d.week,d.cat,d.product,d.sizeKey,d.startCount,d.endCount,d.costPerBottle])]);
+  const hIM = ['key','cost','matchKey','savedAt'];
+  await gasWrite(SN.INV_MAPPINGS,[hIM,...Object.entries(st.inventoryMappings||{}).map(([k,v])=>[k,v.cost,v.matchKey||'',v.savedAt||''])]);
 }
 
 async function pushAllToSheets() {
@@ -1504,6 +1573,7 @@ async function pullBarFromSheets(barId) {
   const menuItems  = await get(SN.MENU_ITEMS);
   const wasteLogs  = await get(SN.WASTE_LOGS);
   const depletions = await get(SN.DEPLETIONS);
+  const invMappings = await get(SN.INV_MAPPINGS).catch(() => []);
   states[barId].weeks = weeks.map(r=>({id:r[0],week:r[1],start:+r[2],purchases:+r[3],end:+r[4],sales:+r[5],cogs:+r[6],pct:+r[7],notes:r[8]||'',synced:true})).filter(w=>w.id);
   states[barId].purchases = purchases.map(r=>({id:r[0],date:r[1],item:r[2],cat:r[3],cost:+r[4],qty:+r[5],total:+r[6],vendor:r[7]||'',synced:true})).filter(p=>p.id);
   states[barId].priceHistory = {};
@@ -1513,6 +1583,8 @@ async function pullBarFromSheets(barId) {
   states[barId].menuItems = menuItems.map(r=>{try{return{id:r[0],name:r[1],cat:r[2],sellPrice:+r[3],avgWeeklyUnits:+r[4],ingredients:JSON.parse(r[5]||'[]')};}catch(e){return null;}}).filter(Boolean);
   states[barId].wasteLogs = wasteLogs.map(r=>({id:r[0],date:r[1],type:r[2],item:r[3],qty:+r[4],value:+r[5],reason:r[6]||'',synced:true})).filter(l=>l.id);
   states[barId].depletions = depletions.map(r=>({id:r[0],week:r[1],cat:r[2],product:r[3],sizeKey:r[4],startCount:+r[5],endCount:+r[6],costPerBottle:+r[7],synced:true})).filter(d=>d.id);
+  states[barId].inventoryMappings = {};
+  invMappings.forEach(r => { if(r[0]) states[barId].inventoryMappings[r[0]] = { cost: +r[1], matchKey: r[2]||'', savedAt: r[3]||'' }; });
 }
 
 async function pullFromSheets() {
@@ -1636,7 +1708,21 @@ function switchTab(name) {
 // ══════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════
-function fmt$(v){return '$'+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function showInvMappingsInfo() {
+  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
+  const mappings = S().inventoryMappings || {};
+  const count = Object.keys(mappings).length;
+  if (!count) { alert('No inventory mappings saved for ' + (activeBar==='dh'?'Desert Hawk':'The Low Horse') + ' yet.\n\nMappings are created automatically when you upload inventory and confirm price matches.'); return; }
+  const lines = Object.entries(mappings).slice(0, 30).map(([k, v]) => `  ${k.slice(0,30).padEnd(30)} → $${v.cost.toFixed(2)}`);
+  const msg = `${count} inventory mappings for ${activeBar==='dh'?'Desert Hawk':'The Low Horse'}:\n\n${lines.join('\n')}${count > 30 ? `\n  ... and ${count-30} more` : ''}\n\nClear all mappings to re-map from scratch?`;
+  if (confirm(msg)) {
+    S().inventoryMappings = {};
+    saveLocal();
+    showToast('✓ Inventory mappings cleared — will re-match on next inventory upload');
+  }
+}
+
+
 function fmtPct(v){return parseFloat(v||0).toFixed(1)+'%';}
 function cogsBadge(pct){if(pct<=24)return'<span class="badge badge-good">Good</span>';if(pct<=30)return'<span class="badge badge-warn">Watch</span>';return'<span class="badge badge-bad">High</span>';}
 function cogsClass(pct){return pct<=24?'good':pct<=30?'warn':'bad';}
@@ -3418,13 +3504,364 @@ function checkPOSDateOverlap(newStart, newEnd) {
   return null;
 }
 
-function handleInventoryUpload(input,type){
-  const file=input.files[0];if(!file)return;
+// ══════════════════════════════════════════════
+// INVENTORY PARSING (XLSX + CSV)
+// ══════════════════════════════════════════════
+
+// Parse a liquor inventory sheet: col A = product name, col F = total qty (decimal units)
+// Returns array of { name, total } objects
+function parseLiquorInventorySheet(buffer_or_text, isText) {
+  if (isText) {
+    // CSV path
+    const lines = buffer_or_text.split('\n').filter(l => l.trim());
+    const rows = [];
+    lines.slice(1).forEach(line => {
+      const parts = parseCsvLine(line);
+      if (!parts[0] || !parts[0].trim()) return;
+      const name = parts[0].replace(/"/g, '').trim();
+      if (!name || /^(product|item|description|name|total|subtotal)/i.test(name)) return;
+      // Col F = index 5
+      const totalRaw = parts[5] ? parts[5].replace(/[$,"%]/g, '').trim() : '';
+      const total = parseFloat(totalRaw);
+      if (!isNaN(total) && total >= 0) rows.push({ name, total });
+    });
+    return rows;
+  }
+  // XLSX path
+  if (typeof XLSX === 'undefined') return [];
+  try {
+    const wb = XLSX.read(buffer_or_text, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const rows = [];
+    // Find header row (skip rows until we see something that looks like a product name in col A)
+    let startRow = 1;
+    for (let i = 0; i < Math.min(10, data.length); i++) {
+      const a = String(data[i][0] || '').trim();
+      if (a && /^(product|item|description|name|sku)/i.test(a)) { startRow = i + 1; break; }
+    }
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      const name = String(row[0] || '').trim();
+      if (!name || /^(total|subtotal|grand|sum)/i.test(name)) continue;
+      // Col F = index 5
+      const totalRaw = String(row[5] || '').replace(/[$,"%]/g, '').trim();
+      const total = parseFloat(totalRaw);
+      if (!isNaN(total) && total >= 0 && name.length > 1) rows.push({ name, total });
+    }
+    return rows;
+  } catch(e) {
+    console.error('XLSX parse error:', e);
+    return [];
+  }
+}
+
+// Parse keg/draft inventory sheet.
+// Keg rows: col A = product name, col B = fill level (0–1 decimal), col C = Backup (whole kegs waiting)
+// Package beer/mixer rows have integer totals just like liquor sheet — we include them too.
+// Returns array of { name, total, isKeg, fillLevel, backup }
+function parseKegInventorySheet(buffer_or_text, isText) {
+  let data = [];
+  if (isText) {
+    const lines = buffer_or_text.split('\n').filter(l => l.trim());
+    data = lines.map(l => parseCsvLine(l).map(c => c.replace(/"/g,'').trim()));
+    if (!data.length) return [];
+    data = data.slice(1); // skip header
+  } else {
+    if (typeof XLSX === 'undefined') return [];
+    try {
+      const wb = XLSX.read(buffer_or_text, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      // Skip to first row after header
+      let startRow = 1;
+      for (let i = 0; i < Math.min(8, raw.length); i++) {
+        const a = String(raw[i][0]||'').trim();
+        if (a && /^(product|item|name|keg|description)/i.test(a)) { startRow = i + 1; break; }
+      }
+      data = raw.slice(startRow).map(r => r.map(c => String(c||'').trim()));
+    } catch(e) { console.error('Keg XLSX parse:', e); return []; }
+  }
+
+  const rows = [];
+  data.forEach(row => {
+    const name = String(row[0]||'').trim();
+    if (!name || /^(total|subtotal|grand|sum|product|item)/i.test(name)) return;
+    if (name.length < 2) return;
+
+    const colB = parseFloat(String(row[1]||'').replace(/[$,%]/g,''));
+    const colC = parseFloat(String(row[2]||'').replace(/[$,%]/g,''));
+
+    // Detect keg: fill level is typically 0–1 decimal (e.g. 0.25, 0.5, 1.0)
+    // Package items have whole-number unit counts like 6, 12, 24
+    const isKeg = !isNaN(colB) && colB >= 0 && colB <= 1 && (String(row[1]||'').includes('.') || colB === 0 || colB === 1);
+    const backup = (!isNaN(colC) && colC > 0) ? colC : 0;
+
+    if (isKeg) {
+      // total = fill_level + backup whole kegs (each backup keg = 1.0)
+      const total = (isNaN(colB) ? 0 : colB) + backup;
+      rows.push({ name, total, isKeg: true, fillLevel: isNaN(colB)?0:colB, backup });
+    } else {
+      // Package item — col B is just a quantity count
+      const total = isNaN(colB) ? 0 : colB;
+      if (total > 0) rows.push({ name, total, isKeg: false, fillLevel: null, backup: 0 });
+    }
+  });
+  return rows;
+}
+
+// Simple CSV line parser that handles quoted fields
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+// ══════════════════════════════════════════════
+// INVENTORY → PRICE HISTORY MATCHING
+// ══════════════════════════════════════════════
+
+// Get best unit cost for an inventory product name by checking:
+// 1. Saved inventoryMappings (permanent, user-confirmed)
+// 2. priceHistory fuzzy match
+// Returns { cost, matchKey, matchType: 'saved'|'fuzzy'|'guessed'|'none', score }
+function findInventoryUnitCost(productName, barId) {
+  const bid = barId || activeBar;
+  const st = states[bid];
+  const nameLower = productName.toLowerCase().trim();
+
+  // 1. Check saved mappings first
+  const saved = (st.inventoryMappings || {})[nameLower];
+  if (saved && saved.cost > 0) {
+    return { cost: saved.cost, matchKey: saved.matchKey, matchType: 'saved', score: 1 };
+  }
+
+  // 2. Fuzzy match against priceHistory keys
+  const ph = st.priceHistory || {};
+  let bestKey = null, bestScore = 0, bestCost = 0;
+  for (const key of Object.keys(ph)) {
+    const entry = ph[key];
+    // Use item name stored in price history, or the key itself
+    const candidate = (entry.item || key).toLowerCase();
+    const sc = inventorySimilarity(nameLower, candidate);
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestKey = key;
+      // Get the most recent cost from history
+      const hist = entry.history || [];
+      bestCost = hist.length ? hist[hist.length - 1].price : 0;
+    }
+  }
+
+  if (bestScore >= 0.65 && bestCost > 0) {
+    return { cost: bestCost, matchKey: bestKey, matchType: 'fuzzy', score: bestScore };
+  }
+  if (bestScore >= 0.4 && bestCost > 0) {
+    return { cost: bestCost, matchKey: bestKey, matchType: 'guessed', score: bestScore };
+  }
+  return { cost: 0, matchKey: null, matchType: 'none', score: 0 };
+}
+
+// Similarity function tailored for inventory matching (handles size suffixes, brand variants)
+function inventorySimilarity(a, b) {
+  // Strip common size/format tokens before comparing
+  const sizeTokens = /\b(750ml|1\.75l|1l|1\.0l|liter|litre|375ml|50ml|200ml|355ml|12oz|16oz|22oz|24oz|32oz|6pk|12pk|24pk|case|btl|btls|bottle|bottles|can|cans|keg|half|bbl|1\/2|1\/4|1\/6)\b/gi;
+  const clean = s => s.replace(sizeTokens, '').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  const ta = new Set(clean(a).split(' ').filter(t => t.length > 1));
+  const tb = new Set(clean(b).split(' ').filter(t => t.length > 1));
+  if (!ta.size || !tb.size) return 0;
+  let shared = 0;
+  ta.forEach(t => { if (tb.has(t)) shared++; });
+  // Bonus if first significant token matches (brand name)
+  const fa = [...ta][0], fb = [...tb][0];
+  const bonus = (fa && fb && fa === fb) ? 0.1 : 0;
+  return Math.min(1, shared / Math.max(ta.size, tb.size) + bonus);
+}
+
+// ══════════════════════════════════════════════
+// INVENTORY VALUATION MODAL
+// ══════════════════════════════════════════════
+
+let _invValContext = null; // { type:'start'|'end', rows:[], invType:'liquor'|'keg', barId }
+
+function openInvValModal(rows, type, invType) {
+  _invValContext = { type, rows, invType, barId: activeBar };
+
+  const typeLabel = type === 'start' ? 'OPENING' : 'CLOSING';
+  const invLabel = invType === 'keg' ? 'DRAFT/KEG' : 'LIQUOR';
+  document.getElementById('inv-val-modal-title').textContent = `${typeLabel} ${invLabel} VALUATION`;
+  document.getElementById('inv-val-modal-sub').textContent =
+    `${rows.length} items found — review price matches and confirm to auto-populate inventory value.`;
+  document.getElementById('inv-val-apply-label').textContent = type === 'start' ? 'Start' : 'End';
+
+  // Build matched rows
+  const matchedRows = rows.map((r, i) => {
+    const match = findInventoryUnitCost(r.name, activeBar);
+    return { ...r, idx: i, cost: match.cost, matchKey: match.matchKey, matchType: match.matchType, score: match.score };
+  });
+  _invValContext.matchedRows = matchedRows;
+
+  renderInvValRows(matchedRows);
+
+  document.getElementById('inv-val-modal-overlay').style.display = 'flex';
+}
+
+function closeInvValModal() {
+  document.getElementById('inv-val-modal-overlay').style.display = 'none';
+  _invValContext = null;
+}
+
+function renderInvValRows(matchedRows) {
+  let matched = 0, guessed = 0, unmatched = 0;
+  let grandTotal = 0;
+
+  const rowsHtml = matchedRows.map((r, i) => {
+    const value = r.total * r.cost;
+    grandTotal += value;
+
+    let pillHtml, pillClass;
+    if (r.matchType === 'saved' || r.matchType === 'fuzzy') {
+      pillClass = 'matched'; pillHtml = `✓ ${escHtml((r.matchKey||'').slice(0,22))}`; matched++;
+    } else if (r.matchType === 'guessed') {
+      pillClass = 'guessed'; pillHtml = `~ ${escHtml((r.matchKey||'').slice(0,22))}`; guessed++;
+    } else {
+      pillClass = 'unmatched'; pillHtml = 'no price history'; unmatched++;
+    }
+
+    const isKegStr = r.isKeg
+      ? `<div style="font-family:var(--mono);font-size:9px;color:#2980b9;margin-top:1px;">🍺 ${r.fillLevel !== null ? Math.round(r.fillLevel*100)+'% full' : ''} + ${r.backup} backup</div>`
+      : '';
+
+    return `<div class="inv-val-row" id="ivr-${i}">
+      <div>
+        <div class="inv-val-name">${escHtml(r.name)}</div>
+        ${isKegStr}
+      </div>
+      <div style="text-align:right;">${r.total % 1 === 0 ? r.total.toFixed(0) : r.total.toFixed(2)}</div>
+      <div style="text-align:right;">
+        <input type="number" step="0.01" min="0" value="${r.cost.toFixed(2)}"
+          style="width:72px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:3px;font-size:12px;font-family:var(--mono);text-align:right;"
+          onchange="updateInvValCost(${i}, parseFloat(this.value)||0)">
+      </div>
+      <div style="text-align:right;font-family:var(--display);font-size:15px;color:${value > 0 ? 'var(--text)' : 'var(--muted)'};" id="ivr-val-${i}">${fmt$(value)}</div>
+      <div><span class="inv-match-pill ${pillClass}">${pillHtml}</span></div>
+      <div>
+        <button onclick="openInvItemOverride(${i})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;font-family:var(--mono);">map</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('inv-val-rows').innerHTML = rowsHtml || '<div class="empty-state">No items found</div>';
+  document.getElementById('inv-val-grand-total').textContent = fmt$(grandTotal);
+  document.getElementById('inv-val-matched-count').textContent = matched;
+  document.getElementById('inv-val-guessed-count').textContent = guessed;
+  document.getElementById('inv-val-unmatched-count').textContent = unmatched;
+  _invValContext._grandTotal = grandTotal;
+}
+
+function updateInvValCost(idx, cost) {
+  if (!_invValContext) return;
+  _invValContext.matchedRows[idx].cost = cost;
+  // Recalculate row total
+  const r = _invValContext.matchedRows[idx];
+  const value = r.total * cost;
+  const valEl = document.getElementById('ivr-val-' + idx);
+  if (valEl) valEl.textContent = fmt$(value);
+  // Recalculate grand total
+  const grand = _invValContext.matchedRows.reduce((s, mr) => s + mr.total * mr.cost, 0);
+  document.getElementById('inv-val-grand-total').textContent = fmt$(grand);
+  _invValContext._grandTotal = grand;
+}
+
+function openInvItemOverride(idx) {
+  if (!_invValContext) return;
+  const r = _invValContext.matchedRows[idx];
+  const ph = states[activeBar].priceHistory || {};
+  const options = Object.entries(ph).map(([key, entry]) => {
+    const hist = entry.history || [];
+    const latestCost = hist.length ? hist[hist.length-1].price : 0;
+    return `<option value="${escHtml(key)}" data-cost="${latestCost}">${escHtml(entry.item || key)} — ${fmt$(latestCost)}</option>`;
+  }).join('');
+
+  const sel = prompt(
+    `Map "${r.name}" to a price history item.\n\nCurrent match: ${r.matchKey || 'none'}\nCurrent cost: $${r.cost.toFixed(2)}\n\nEnter the exact unit cost to use, or leave blank to keep current:`
+  );
+  if (sel === null) return;
+  const newCost = parseFloat(sel);
+  if (!isNaN(newCost) && newCost > 0) {
+    _invValContext.matchedRows[idx].cost = newCost;
+    _invValContext.matchedRows[idx].matchType = 'saved';
+    updateInvValCost(idx, newCost);
+    // Save as permanent mapping
+    saveInventoryMapping(r.name, newCost, r.matchKey || r.name);
+    showToast(`✓ ${r.name.slice(0,24)} mapped at $${newCost.toFixed(2)}`);
+  }
+}
+
+// Apply the valuation total to the entry form
+function applyInvValuation() {
+  if (!_invValContext) return;
+  const { type, matchedRows, _grandTotal, invType, barId } = _invValContext;
+
+  // Save all confirmed fuzzy/guessed matches as permanent mappings
+  matchedRows.forEach(r => {
+    if ((r.matchType === 'fuzzy' || r.matchType === 'guessed') && r.cost > 0 && r.matchKey) {
+      saveInventoryMapping(r.name, r.cost, r.matchKey);
+    }
+  });
+
+  // The keg valuation adds TO the liquor valuation total
+  const fieldId = type === 'start' ? 'entry-start' : 'entry-end';
+  const statusId = type === 'start' ? 'start-status' : 'end-status';
+  const kegStatusId = type === 'start' ? 'start-keg-status' : 'end-keg-status';
+
+  const existingEl = document.getElementById(fieldId);
+  const existingVal = parseFloat(existingEl.value) || 0;
+
+  if (invType === 'keg') {
+    // Add keg value to whatever is already in the field
+    const newTotal = existingVal + _grandTotal;
+    existingEl.value = newTotal.toFixed(2);
+    document.getElementById(kegStatusId).textContent = `✓ +${fmt$(_grandTotal)} (keg) = ${fmt$(newTotal)} total`;
+  } else {
+    existingEl.value = _grandTotal.toFixed(2);
+    const itemCount = matchedRows.length;
+    const matchedCount = matchedRows.filter(r => r.matchType !== 'none').length;
+    const statusEl = document.getElementById(statusId);
+    if (statusEl) statusEl.textContent = `✓ ${fmt$(_grandTotal)} from ${itemCount} items (${matchedCount} priced)`;
+  }
+
+  updatePreview();
+  saveLocal();
+  closeInvValModal();
+  showToast(`✓ ${type === 'start' ? 'Start' : 'End'} inventory set to ${fmt$(_grandTotal)}`);
+}
+
+// Persist an inventory product → cost mapping
+function saveInventoryMapping(productName, cost, matchKey) {
+  if (!S().inventoryMappings) S().inventoryMappings = {};
+  S().inventoryMappings[productName.toLowerCase().trim()] = { cost, matchKey, savedAt: new Date().toISOString() };
+  saveLocal();
+}
+
+// ══════════════════════════════════════════════
+// INVENTORY UPLOAD HANDLERS (REFACTORED)
+// ══════════════════════════════════════════════
+
+function handleInventoryUpload(input, type) {
+  const file = input.files[0]; if (!file) return;
 
   // Extract date from filename and auto-set the correct count date field
   const { startDate: detectedDate } = extractDateRangeFromFilename(file.name);
   if (detectedDate) {
-    if (type==='start') {
+    if (type === 'start') {
       const el = document.getElementById('entry-start-date');
       if (el && !el.value) { el.value = detectedDate; onPeriodDateChange(); }
       showToast('📅 Opening count date set from filename: ' + detectedDate);
@@ -3435,25 +3872,136 @@ function handleInventoryUpload(input,type){
     }
   }
 
-  const reader=new FileReader();
-  reader.onload=(e)=>{
-    const lines=e.target.result.split('\n').filter(l=>l.trim());let sum=0;
-    lines.slice(1).forEach(line=>{const parts=line.split(',');if(parts.length>=2){const last=parseFloat(parts[parts.length-1].replace(/[$,]/g,''));if(!isNaN(last)&&last>0&&last<100000)sum+=last;}});
-    if(type==='start'){
-      document.getElementById('entry-start').value=sum.toFixed(2);
-      document.getElementById('start-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
-      document.getElementById('upload-start').classList.add('loaded');
-      document.getElementById('submit-start-btn').style.display='block';
-      window._stagedStart = { sum, lines: lines.length-1, filename: file.name, detectedDate };
+  const isXlsx = /\.(xlsx|xls)$/i.test(file.name);
+  const reader = new FileReader();
+
+  if (isXlsx) {
+    reader.onload = (e) => {
+      const buffer = new Uint8Array(e.target.result);
+      const rows = parseLiquorInventorySheet(buffer, false);
+      if (!rows.length) {
+        showToast('⚠ No valid rows found in spreadsheet', true);
+        return;
+      }
+
+      // Check if we have any price history to match against
+      const hasPriceHistory = Object.keys(S().priceHistory || {}).length > 0;
+      const hasMappings = Object.keys(S().inventoryMappings || {}).length > 0;
+
+      if (hasPriceHistory || hasMappings) {
+        // Launch valuation modal
+        const statusId = type === 'start' ? 'start-status' : 'end-status';
+        document.getElementById(statusId).textContent = `✓ ${rows.length} items — reviewing prices...`;
+        document.getElementById('upload-' + type).classList.add('loaded');
+        window['_staged' + (type === 'start' ? 'Start' : 'End')] = { sum: 0, lines: rows.length, filename: file.name, detectedDate };
+        document.getElementById('submit-' + type + '-btn').style.display = 'block';
+        openInvValModal(rows, type, 'liquor');
+      } else {
+        // No price history — just sum col F raw totals as dollar values
+        const sum = rows.reduce((s, r) => s + r.total, 0);
+        document.getElementById(type === 'start' ? 'entry-start' : 'entry-end').value = sum.toFixed(2);
+        const statusId = type === 'start' ? 'start-status' : 'end-status';
+        document.getElementById(statusId).textContent = `✓ ${fmt$(sum)} from ${rows.length} items (add invoices to enable auto-pricing)`;
+        document.getElementById('upload-' + type).classList.add('loaded');
+        window['_staged' + (type === 'start' ? 'Start' : 'End')] = { sum, lines: rows.length, filename: file.name, detectedDate };
+        document.getElementById('submit-' + type + '-btn').style.display = 'block';
+        updatePreview();
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // CSV fallback
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const rows = parseLiquorInventorySheet(text, true);
+      const hasPriceHistory = Object.keys(S().priceHistory || {}).length > 0;
+
+      if (rows.length && hasPriceHistory) {
+        const statusId = type === 'start' ? 'start-status' : 'end-status';
+        document.getElementById(statusId).textContent = `✓ ${rows.length} items — reviewing prices...`;
+        document.getElementById('upload-' + type).classList.add('loaded');
+        window['_staged' + (type === 'start' ? 'Start' : 'End')] = { sum: 0, lines: rows.length, filename: file.name, detectedDate };
+        document.getElementById('submit-' + type + '-btn').style.display = 'block';
+        openInvValModal(rows, type, 'liquor');
+      } else {
+        // Legacy: sum last numeric column
+        const lines = text.split('\n').filter(l => l.trim());
+        let sum = 0;
+        lines.slice(1).forEach(line => {
+          const parts = line.split(',');
+          if (parts.length >= 2) {
+            const last = parseFloat(parts[parts.length-1].replace(/[$,]/g,''));
+            if (!isNaN(last) && last > 0 && last < 100000) sum += last;
+          }
+        });
+        document.getElementById(type === 'start' ? 'entry-start' : 'entry-end').value = sum.toFixed(2);
+        const statusId = type === 'start' ? 'start-status' : 'end-status';
+        document.getElementById(statusId).textContent = `✓ ${fmt$(sum)} from ${lines.length-1} items`;
+        document.getElementById('upload-' + type).classList.add('loaded');
+        window['_staged' + (type === 'start' ? 'Start' : 'End')] = { sum, lines: lines.length-1, filename: file.name, detectedDate };
+        document.getElementById('submit-' + type + '-btn').style.display = 'block';
+        updatePreview();
+      }
+    };
+    reader.readAsText(file);
+  }
+}
+
+function handleKegInventoryUpload(input, type) {
+  const file = input.files[0]; if (!file) return;
+  const isXlsx = /\.(xlsx|xls)$/i.test(file.name);
+  const reader = new FileReader();
+
+  const processRows = (rows) => {
+    if (!rows.length) { showToast('⚠ No valid rows found in keg sheet', true); return; }
+    const statusId = type === 'start' ? 'start-keg-status' : 'end-keg-status';
+    document.getElementById(statusId).textContent = `✓ ${rows.length} items parsed — reviewing...`;
+    document.getElementById('upload-' + type + '-keg').classList.add('loaded');
+    window['_stagedKeg' + (type === 'start' ? 'Start' : 'End')] = { rows, filename: file.name };
+    document.getElementById('submit-' + type + '-keg-btn').style.display = 'block';
+
+    const hasPriceHistory = Object.keys(S().priceHistory || {}).length > 0;
+    if (hasPriceHistory || Object.keys(S().inventoryMappings || {}).length > 0) {
+      openInvValModal(rows, type, 'keg');
     } else {
-      document.getElementById('entry-end').value=sum.toFixed(2);
-      document.getElementById('end-status').textContent=`✓ ${fmt$(sum)} from ${lines.length-1} items`;
-      document.getElementById('upload-end').classList.add('loaded');
-      document.getElementById('submit-end-btn').style.display='block';
-      window._stagedEnd = { sum, lines: lines.length-1, filename: file.name, detectedDate };
+      showToast(`✓ ${rows.length} keg items loaded — add invoices to enable auto-pricing`, false);
     }
-    updatePreview();
-  };reader.readAsText(file);
+  };
+
+  if (isXlsx) {
+    reader.onload = (e) => {
+      const rows = parseKegInventorySheet(new Uint8Array(e.target.result), false);
+      processRows(rows);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = (e) => {
+      const rows = parseKegInventorySheet(e.target.result, true);
+      processRows(rows);
+    };
+    reader.readAsText(file);
+  }
+}
+
+function submitKegInventory(type) {
+  const staged = type === 'start' ? window._stagedKegStart : window._stagedKegEnd;
+  if (!staged) return;
+  const label = type === 'start' ? 'Start' : 'End';
+  const msg = `Submit ${label} Keg Inventory?\n\n${staged.rows.length} items\nFile: ${staged.filename}`;
+  if (!confirm(msg)) return;
+  if (!S().submissionLog) S().submissionLog = [];
+  S().submissionLog.unshift({
+    id: Date.now()+'', type: 'inventory', submittedAt: new Date().toISOString(),
+    bar: activeBar, filename: staged.filename,
+    summary: `${label} Keg Inventory · ${staged.filename} · ${staged.rows.length} items`,
+    data: { type: type + '-keg', lines: staged.rows.length }
+  });
+  saveLocal();
+  document.getElementById('submit-' + type + '-keg-btn').style.display = 'none';
+  const statusId = type === 'start' ? 'start-keg-status' : 'end-keg-status';
+  document.getElementById(statusId).textContent += ' ✓ Submitted';
+  window['_stagedKeg' + (type === 'start' ? 'Start' : 'End')] = null;
+  showToast(`✓ ${label} keg inventory submitted`);
 }
 
 function submitInventory(type) {
