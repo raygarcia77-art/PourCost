@@ -1893,6 +1893,7 @@ function showInvMappingsInfo() {
 
 
 function fmtPct(v){return parseFloat(v||0).toFixed(1)+'%';}
+function fmt$(v){return '$'+parseFloat(v||0).toFixed(2);}
 function cogsBadge(pct){if(pct<=24)return'<span class="badge badge-good">Good</span>';if(pct<=30)return'<span class="badge badge-warn">Watch</span>';return'<span class="badge badge-bad">High</span>';}
 function cogsClass(pct){return pct<=24?'good':pct<=30?'warn':'bad';}
 function syncChip(s){return s?'<span style="color:var(--green);font-size:10px;" title="Synced">●</span>':'<span style="color:var(--accent);font-size:10px;" title="Pending sync">○</span>';}
