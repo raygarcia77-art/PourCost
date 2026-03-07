@@ -1353,7 +1353,7 @@ VENDORS YOU WILL SEE:
 - Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. UPRICE = actual product cost before deposit — USE THIS as unitCost. DEP = keg deposit (ignore). PRICE = UPRICE + DEP (do NOT use). AMOUNT = total including deposit (do NOT use). For kegs: unitCost = UPRICE, total = UPRICE × qty. Skip ALL lines where DESCRIPTION contains "EMPTY KEG", "POS", "MISCELLANEOUS", or QTY is negative.
 - Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
 - Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
-- Southern Glazer's: CS ORD/DLV and BTLS ORD/DLV columns. UNIT NET AMOUNT = price per SINGLE BOTTLE — use directly as unitCost, NEVER divide. qty = CS × BPC (if case order) or BTLS (if bottle order). Skip COOK COUNTY ALCOHOL TAX, CHICAGO ALCOHOL EXCISE TAX, DELIVERY CHARGE lines entirely.
+- Southern Glazer's: CS ORD/DLV and BTLS ORD/DLV columns — only one has a number per item. CS mode: UNIT NET = per-case price, unitCost = UNIT NET ÷ BPC, qty = CS × BPC. BTLS mode: UNIT NET = per-bottle price already, unitCost = UNIT NET directly, qty = BTLS. Verify mode by checking: if UNIT NET × BTLS = TOTAL it is BTLS mode; if UNIT NET × CS × BPC ≈ TOTAL it is CS mode. Skip COOK COUNTY ALCOHOL TAX, CHICAGO ALCOHOL EXCISE TAX, DELIVERY CHARGE lines.
 
 RULES:
 1. Return ONLY a JSON array, no other text.
@@ -1602,20 +1602,29 @@ CRITICAL - EXTRACT FROM HEADER FIRST:
 - vendor: Distributor name at top.
 
 SOUTHERN GLAZER'S - COLUMNS: CS ORD/DLV | BTLS ORD/DLV | ITEM | UNIT PRICE | UNIT DISC | UNIT NET AMOUNT | TAXES | TOTAL
-- CS ORD/DLV = cases ordered (format "2/2" means 2 cases). If blank or 0, ordered by bottle.
-- BTLS ORD/DLV = individual bottles ordered (format "1/1" means 1 bottle). If blank or 0, ordered by case.
-- UNIT NET AMOUNT = price per SINGLE BOTTLE after discount. USE THIS DIRECTLY as unitCost. DO NOT divide by anything.
-- The sub-lines below each item (COOK COUNTY ALCOHOL TAX, CHICAGO ALCOHOL EXCISE TAX) are tax rows — IGNORE THEM ENTIRELY. Do not use their numbers for anything.
-- qty = total bottles: if CS has a number, qty = CS × BPC. If BTLS has a number, qty = BTLS.
-- unitCost = UNIT NET AMOUNT exactly as printed (per bottle). NEVER divide the line total by qty.
-- total = unitCost × qty
-- Skip DELIVERY CHARGE lines and all tax lines.
 
-CRITICAL EXAMPLES from invoice 2187706 — follow exactly:
-  CS=2/2, BPC=12, UNIT NET=13.50 → JOSE CUERVO: qty=24, unitCost=13.50, total=324.00
-  BTLS=1/1, BPC=12, UNIT NET=36.96 → CAZADORES: qty=1, unitCost=36.96, total=36.96
-  CS=2/2, BPC=12, UNIT NET=31.12 → JAGERMEISTER: qty=24, unitCost=31.12, total=746.88  ← DO NOT calculate 62.24÷24=2.59. unitCost IS 31.12.
-  BTLS=1/1, BPC=6, UNIT NET=37.48 → NOCHELUNA SOTOL: qty=1, unitCost=37.48, total=37.48
+TWO ORDERING MODES — determined by which column has a number:
+
+MODE 1 — CS ORD/DLV has a number (case order):
+- UNIT NET AMOUNT = price per CASE (not per bottle)
+- unitCost per bottle = UNIT NET AMOUNT ÷ BPC
+- qty = CS number × BPC (total bottles)
+- total = unitCost × qty
+- Some items print a second indented row showing the per-bottle breakdown — IGNORE that row, calculate unitCost yourself as UNIT NET ÷ BPC
+- Example: CS=2/2, BPC=12, UNIT NET=162.00 → JOSE CUERVO: unitCost=162.00÷12=$13.50/btl, qty=24, total=324.00
+
+MODE 2 — BTLS ORD/DLV has a number (bottle order):
+- UNIT NET AMOUNT = price per BOTTLE already
+- unitCost = UNIT NET AMOUNT directly (do NOT divide)
+- qty = BTLS number
+- total = unitCost × qty
+- Example: BTLS=1/1, UNIT NET=36.96 → CAZADORES: unitCost=$36.96/btl, qty=1, total=36.96
+- Example: BTLS=2/2, UNIT NET=31.12 → JAGERMEISTER: unitCost=$31.12/btl, qty=2, total=62.24
+- Example: BTLS=1/1, UNIT NET=37.48 → NOCHELUNA SOTOL: unitCost=$37.48/btl, qty=1, total=37.48
+
+TO DETERMINE THE MODE: check whether the number appears in the CS column or the BTLS column. If you are unsure, verify: if UNIT NET × BTLS number = TOTAL, it is BTLS mode. If UNIT NET × CS number × BPC ≈ TOTAL, it is CS mode.
+
+ALL ITEMS: Skip COOK COUNTY ALCOHOL TAX lines, CHICAGO ALCOHOL EXCISE TAX lines, and DELIVERY CHARGE lines entirely.
 
 BREAKTHRU BEVERAGE - COLUMNS: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
 - Case column has number = ordered by case: qty = Case × BPC, unitCost = Ext W/O Tax / qty
