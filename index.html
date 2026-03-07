@@ -180,7 +180,6 @@ input::placeholder{color:var(--muted);}
 .alias-chip button:hover{color:var(--accent2);}
 .alias-add-input{background:var(--surface2);border:1px dashed var(--border);border-radius:20px;padding:3px 11px;font-family:var(--mono);font-size:11px;color:var(--text);width:190px;outline:none;}
 .alias-add-input:focus{border-color:var(--accent);}
-.unmatched-chip{background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.3);border-radius:4px;padding:4px 10px;font-family:var(--mono);font-size:11px;color:var(--accent2);cursor:pointer;display:inline-block;margin:3px;}
 .suggest-chip{background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.25);border-radius:4px;padding:4px 10px;font-family:var(--mono);font-size:11px;color:var(--accent);cursor:pointer;display:inline-block;margin:3px;}
 
 /* ── INVENTORY VALUATION ── */
@@ -328,6 +327,27 @@ input::placeholder{color:var(--muted);}
 .pos-product-select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);margin-left:6px;}
 .pos-new-name-input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);width:200px;margin-left:6px;}
 .pos-new-name-input:focus,.pos-product-select:focus{outline:none;border-color:var(--accent);}
+/* ── UNRESOLVED CONNECTIONS ── */
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--accent2);color:#fff;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--mono);min-width:16px;height:16px;padding:0 4px;margin-left:5px;vertical-align:middle;line-height:1;}
+.attention-banner{background:rgba(192,57,43,0.07);border:1px solid rgba(192,57,43,0.3);border-radius:6px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;cursor:pointer;}
+.attention-banner:hover{border-color:rgba(192,57,43,0.5);background:rgba(192,57,43,0.1);}
+.attention-banner-icon{font-size:20px;flex-shrink:0;}
+.attention-banner-text{font-family:var(--mono);font-size:12px;color:var(--accent2);line-height:1.7;flex:1;}
+.attention-banner-text strong{color:var(--accent2);}
+.attention-banner-cta{font-family:var(--mono);font-size:11px;color:var(--accent2);border:1px solid rgba(192,57,43,0.4);border-radius:3px;padding:4px 10px;white-space:nowrap;flex-shrink:0;}
+.review-section{margin-bottom:22px;}
+.review-section-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.review-section-title.pos{color:#2980b9;}
+.review-section-title.inv{color:var(--accent);}
+.review-section-title.invoice{color:#8e44ad;}
+.review-row{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px 13px;margin-bottom:7px;transition:border-color 0.15s;}
+.review-row.resolved-assign{border-color:var(--green);background:rgba(39,174,96,0.04);}
+.review-row.resolved-new{border-color:var(--accent);background:rgba(212,168,67,0.04);}
+.review-row.resolved-ignore{opacity:0.45;border-color:var(--border);}
+.review-row-name{font-family:var(--display);font-size:14px;letter-spacing:1px;margin-bottom:5px;}
+.review-row-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:7px;line-height:1.6;}
+.review-row-meta .fuzzy-match{color:var(--accent);font-weight:600;}
+.review-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
 /* ── PAR & ORDERING ── */
 .day-btn{padding:4px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);background:none;color:var(--muted);transition:all 0.15s;}
 .day-btn:hover{border-color:var(--text);color:var(--text);}
@@ -465,7 +485,7 @@ input::placeholder{color:var(--muted);}
     <div class="tab" onclick="switchTab('depletion')">Bottle Depletion</div>
     <div class="tab" onclick="switchTab('par')">PAR &amp; Ordering</div>
     <div class="tab" onclick="switchTab('prices')">Price Tracker</div>
-    <div class="tab" onclick="switchTab('mapping')">Product Mapping</div>
+    <div class="tab" onclick="switchTab('mapping')">Connections <span class="tab-badge" id="mapping-badge" style="display:none;">0</span></div>
     <div class="tab" onclick="switchTab('costing')">Menu Costing</div>
     <div class="tab" onclick="switchTab('history')">History</div>
     <div class="tab" onclick="switchTab('settings')">Settings</div>
@@ -481,6 +501,12 @@ input::placeholder{color:var(--muted);}
 
       <!-- POS Date Reminder on Dashboard -->
       <div id="dashboard-pos-reminder" style="display:none;margin-bottom:16px;"></div>
+      <!-- Connections attention banner — shown when unresolved items exist -->
+      <div id="dashboard-attention-banner" style="display:none;" class="attention-banner" onclick="switchTab('mapping')">
+        <div class="attention-banner-icon">⚠️</div>
+        <div class="attention-banner-text" id="dashboard-attention-text">Some product names need connecting.</div>
+        <div class="attention-banner-cta">Review Now →</div>
+      </div>
       <div class="stats-row" id="dash-stats-row">
         <div class="stat-card"><div class="stat-label">Weekly COGS %</div><div class="stat-value" id="dash-weekly-cogs">—</div><div class="stat-sub" id="dash-weekly-sub">No data yet</div></div>
         <div class="stat-card"><div class="stat-label">Monthly COGS %</div><div class="stat-value" id="dash-monthly-cogs">—</div><div class="stat-sub" id="dash-monthly-sub">No data yet</div></div>
@@ -1054,17 +1080,28 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
-    <!-- ── PRODUCT MAPPING ── -->
+    <!-- ── CONNECTIONS (was Product Mapping) ── -->
     <div class="panel" id="panel-mapping">
       <div class="section-header">
-        <div class="section-title">PRODUCT MAPPING — <span id="mapping-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
+        <div class="section-title">CONNECTIONS — <span id="mapping-bar-name" style="color:var(--accent)">DESERT HAWK</span></div>
         <button class="btn btn-primary" onclick="openNewProductModal()">+ New Product</button>
       </div>
       <div class="info-box">
-        <strong>How it works:</strong> Create a <strong>root product</strong> (e.g. "Busch Light") and add POS name variants as aliases (e.g. "HH Busch LT", "EVNT Busch LT"). Each bar has its own product map — aliases that are unique to Desert Hawk or The Low Horse stay separate.
+        <strong>How it works:</strong> POS item names, inventory product names, and invoice product names all need to connect to the same root product so COGS can be calculated correctly. Unresolved names appear below for review. Once connected, they're remembered permanently.
       </div>
-      <div id="unmatched-section" style="display:none;margin-bottom:20px;"><div style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:6px;">⚠ UNMATCHED POS ITEMS — click to assign</div><div class="unmatched-list" id="unmatched-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div></div>
+
+      <!-- NEEDS REVIEW section — shows all three types of unresolved names -->
+      <div id="connections-review-section" style="display:none;margin-bottom:24px;">
+        <div class="section-header" style="margin-bottom:10px;">
+          <div class="section-title" style="color:var(--accent2);">⚠ NEEDS YOUR REVIEW <span id="connections-review-count" style="font-size:13px;"></span></div>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="dismissAllResolved()">✓ Done Reviewing</button>
+        </div>
+        <div id="connections-review-body"></div>
+      </div>
+
+      <!-- Existing product map list -->
       <div id="suggested-section" style="display:none;margin-bottom:20px;"><div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:6px;">✦ AUTO-SUGGESTED GROUPINGS</div><div id="suggested-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div></div>
+      <div class="section-header" style="margin-top:8px;margin-bottom:12px;"><div class="section-title" style="font-size:16px;">PRODUCT LIBRARY</div></div>
       <div id="mapping-list"></div>
       <div id="mapping-empty" class="empty-state">No products yet. Click "+ New Product" to start.</div>
     </div>
@@ -1245,21 +1282,7 @@ Return only the JSON array.</textarea>
   </div>
 </div>
 
-<!-- ASSIGN MODAL -->
-  <div class="modal">
-    <div class="modal-title">ASSIGN POS ITEM</div>
-    <div class="modal-sub" id="assign-modal-item-label">Assigning: —</div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Select existing product:</div>
-    <div class="root-suggestions" id="assign-product-list"></div>
-    <hr class="divider" style="margin:12px 0;">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Or create new product:</div>
-    <div style="display:flex;gap:10px;">
-      <input type="text" id="assign-new-name" placeholder="Root product name" style="flex:1">
-      <button class="btn btn-primary" onclick="assignCreateNew()">Create</button>
-    </div>
-    <div style="margin-top:18px;text-align:right;"><button class="btn btn-outline" onclick="closeAssignModal()">Cancel</button></div>
-  </div>
-</div>
+
 
 <div class="modal-overlay" id="new-product-modal">
   <div class="modal">
@@ -1335,7 +1358,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{} };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{}, unresolvedInvItems:[] };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -1875,7 +1898,23 @@ function applyPOSStaged() {
 
   // Extract items and check for unmatched
   const newItems = extractPosItems(text);
-  if (newItems.length > 0) openPosReviewModal(newItems);
+  if (newItems.length > 0) {
+    // Store all new POS item names
+    if (!S().posItems) S().posItems = [];
+    newItems.forEach(n => { if (!S().posItems.includes(n)) S().posItems.push(n); });
+    saveLocal();
+    // Check which are unresolved and update badge
+    updateConnectionsBadge();
+    // Open legacy review modal only if we have a product library to assign to — 
+    // otherwise just update the badge so they go to Connections tab
+    const unmatched = newItems.filter(n => !resolveProduct(n) && !(S().ignoredPosItems||[]).includes(n));
+    if (unmatched.length > 0 && S().productMaps.length > 0) {
+      openPosReviewModal(newItems);
+    } else if (unmatched.length > 0) {
+      const badge = document.getElementById('mapping-badge');
+      showToast(`⚠ ${unmatched.length} new POS item${unmatched.length !== 1 ? 's' : ''} need connecting — see Connections tab`);
+    }
+  }
 }
 
 function cancelPOSStaged() {
@@ -2323,12 +2362,12 @@ function resolveProduct(posName,barId){
 function guessRootName(n){return n.replace(/^(hh|evnt|event|happy hour)\s+/i,'').replace(/\s+(pint|draft|btl|bottle|can|\d+oz|glass)$/i,'').trim();}
 
 function renderMapping(){
-  if(activeBar==='combined'){document.getElementById('mapping-list').innerHTML='';document.getElementById('mapping-empty').style.display='block';document.getElementById('mapping-empty').textContent='Switch to a specific bar to manage product mapping.';document.getElementById('unmatched-section').style.display='none';document.getElementById('suggested-section').style.display='none';return;}
+  if(activeBar==='combined'){document.getElementById('mapping-list').innerHTML='';document.getElementById('mapping-empty').style.display='block';document.getElementById('mapping-empty').textContent='Switch to a specific bar to manage product mapping.';document.getElementById('suggested-section').style.display='none';document.getElementById('connections-review-section').style.display='none';return;}
+  renderConnectionsReview();
+  updateConnectionsBadge();
   const st=S(),posItems=[...new Set(st.posItems||[])],ignored=new Set(st.ignoredPosItems||[]),unmatched=posItems.filter(n=>!resolveProduct(n)&&!ignored.has(n));
   const groups=[],used=new Set();
   unmatched.forEach(a=>{if(used.has(a))return;const g=[a];used.add(a);unmatched.forEach(b=>{if(!used.has(b)&&similarity(a,b)>=0.5){g.push(b);used.add(b);}});if(g.length>1)groups.push(g);});
-  const us=document.getElementById('unmatched-section'),ul=document.getElementById('unmatched-list');
-  if(unmatched.length){us.style.display='block';ul.innerHTML=unmatched.map(n=>`<div class="unmatched-chip" onclick="openAssignModal('${escHtml(n)}')">${escHtml(n)}</div>`).join('');}else us.style.display='none';
   const ss=document.getElementById('suggested-section'),sl=document.getElementById('suggested-list');
   if(groups.length){ss.style.display='block';sl.innerHTML=groups.map(g=>`<div class="suggest-chip" onclick='createProductFromSuggestion(${JSON.stringify(g)})'>✦ ${g.map(escHtml).join(' · ')}</div>`).join('');}else ss.style.display='none';
   const le=document.getElementById('mapping-list'),ee=document.getElementById('mapping-empty');
@@ -2342,14 +2381,255 @@ function deleteProduct(id){if(!confirm('Delete this product?'))return;S().produc
 function addAlias(pid,alias){alias=alias.trim();if(!alias)return;const p=S().productMaps.find(p=>p.id===pid);if(!p||p.aliases.map(a=>a.toLowerCase()).includes(alias.toLowerCase()))return;p.aliases.push(alias);saveLocal();renderMapping();showToast(`✓ Alias added`);scheduleSync();}
 function removeAlias(pid,alias){const p=S().productMaps.find(p=>p.id===pid);if(!p)return;p.aliases=p.aliases.filter(a=>a.toLowerCase()!==alias.toLowerCase());saveLocal();renderMapping();scheduleSync();}
 
-let assigningItem=null;
-function openAssignModal(n){assigningItem=n;document.getElementById('assign-modal-item-label').textContent=`Assigning: "${n}"`;document.getElementById('assign-new-name').value=guessRootName(n);document.getElementById('assign-product-list').innerHTML=S().productMaps.map(p=>`<div class="suggest-chip" onclick="assignToProduct('${p.id}')">${escHtml(p.name)}</div>`).join('')||'<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">No products yet</span>';document.getElementById('assign-modal').classList.add('show');}
-function closeAssignModal(){document.getElementById('assign-modal').classList.remove('show');assigningItem=null;}
-function assignToProduct(pid){if(!assigningItem)return;addAlias(pid,assigningItem);closeAssignModal();}
-function assignCreateNew(){const name=document.getElementById('assign-new-name').value.trim();if(!name){alert('Enter a name');return;}const aliases=[name];if(assigningItem&&assigningItem.toLowerCase()!==name.toLowerCase())aliases.push(assigningItem);S().productMaps.push({id:Date.now().toString(),name,cat:'Other',aliases});saveLocal();closeAssignModal();renderMapping();showToast(`✓ "${name}" created`);scheduleSync();}
 function openNewProductModal(){document.getElementById('new-product-name').value='';document.getElementById('new-product-aliases').value='';document.getElementById('new-product-modal-sub').textContent='Adding to '+(activeBar==='dh'?'Desert Hawk':'The Low Horse');document.getElementById('new-product-modal').classList.add('show');setTimeout(()=>document.getElementById('new-product-name').focus(),100);}
 function closeNewProductModal(){document.getElementById('new-product-modal').classList.remove('show');}
 function createProductFromSuggestion(g){const p=typeof g==='string'?JSON.parse(g):g;document.getElementById('new-product-name').value=guessRootName(p[0]);document.getElementById('new-product-aliases').value=p.join(', ');openNewProductModal();}
+
+// ══════════════════════════════════════════════
+// EXTRACT POS ITEMS FROM CSV TEXT
+// ══════════════════════════════════════════════
+function extractPosItems(csvText) {
+  // Returns array of unique item name strings from a Toast sales CSV
+  // We look for an Item Name column — this is from a per-item (not category summary) report
+  const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').toLowerCase().trim());
+  const itemCol = headers.findIndex(h => h === 'item name' || h === 'menu item' || h === 'item');
+  if (itemCol < 0) return []; // category-summary report — no per-item rows
+  const seen = new Set();
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(',');
+    const name = (parts[itemCol] || '').replace(/"/g,'').trim();
+    if (name && name.length > 1 && !/^(total|subtotal|grand)/i.test(name)) seen.add(name);
+  }
+  return [...seen];
+}
+
+// ══════════════════════════════════════════════
+// UNIFIED CONNECTIONS REVIEW ENGINE
+// ══════════════════════════════════════════════
+
+// Collect ALL unresolved names across POS items, inventory mappings, and invoice products
+// Returns { pos: string[], inv: string[], total: number }
+function collectUnresolvedConnections(barId) {
+  const bid = barId || activeBar;
+  if (bid === 'combined') return { pos: [], inv: [], total: 0 };
+  const st = states[bid];
+  const ignored = new Set(st.ignoredPosItems || []);
+
+  // 1. POS items with no product map match
+  const posUnresolved = [...new Set(st.posItems || [])]
+    .filter(n => !ignored.has(n) && !resolveProduct(n, bid));
+
+  // 2. Inventory items with no price history AND no saved mapping
+  // We pull these from a separate list we track when items come in unpriced
+  const invUnresolved = [...new Set(st.unresolvedInvItems || [])];
+
+  const total = posUnresolved.length + invUnresolved.length;
+  return { pos: posUnresolved, inv: invUnresolved, total };
+}
+
+// Call this whenever unresolved counts may have changed
+function updateConnectionsBadge() {
+  if (activeBar === 'combined') {
+    const badge = document.getElementById('mapping-badge');
+    if (badge) badge.style.display = 'none';
+    const banner = document.getElementById('dashboard-attention-banner');
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+  const { pos, inv, total } = collectUnresolvedConnections();
+  const badge = document.getElementById('mapping-badge');
+  if (badge) {
+    badge.textContent = total;
+    badge.style.display = total > 0 ? 'inline-flex' : 'none';
+  }
+  const banner = document.getElementById('dashboard-attention-banner');
+  const bannerText = document.getElementById('dashboard-attention-text');
+  if (banner && bannerText) {
+    if (total > 0) {
+      const parts = [];
+      if (pos.length) parts.push(`${pos.length} POS item${pos.length !== 1 ? 's' : ''}`);
+      if (inv.length) parts.push(`${inv.length} inventory item${inv.length !== 1 ? 's' : ''}`);
+      bannerText.innerHTML = `<strong>${total} product name${total !== 1 ? 's' : ''} need connecting</strong> — ${parts.join(' and ')} don't match any known product yet. Until connected, COGS calculations may be incomplete.`;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+}
+
+// Register inventory items that came in with no price match — so they show up in review
+function flagUnresolvedInvItems(itemNames) {
+  if (!S().unresolvedInvItems) S().unresolvedInvItems = [];
+  const ignored = new Set(S().ignoredPosItems || []);
+  itemNames.forEach(name => {
+    const key = name.toLowerCase().trim();
+    if (!ignored.has(name) && !(S().inventoryMappings || {})[key]) {
+      if (!S().unresolvedInvItems.includes(name)) S().unresolvedInvItems.push(name);
+    }
+  });
+  saveLocal();
+  updateConnectionsBadge();
+}
+
+// Render the connections review panel inside the mapping tab
+function renderConnectionsReview() {
+  const section = document.getElementById('connections-review-section');
+  const body = document.getElementById('connections-review-body');
+  const countEl = document.getElementById('connections-review-count');
+  if (!section || !body) return;
+
+  if (activeBar === 'combined') { section.style.display = 'none'; return; }
+
+  const { pos, inv, total } = collectUnresolvedConnections();
+
+  if (total === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  countEl.textContent = `(${total})`;
+
+  let html = '';
+
+  // ── POS items ──
+  if (pos.length) {
+    html += `<div class="review-section">
+      <div class="review-section-title pos">🖥 POS ITEMS — ${pos.length} unconnected</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.7;">
+        These names came from your Toast sales report. Connect each one to a root product so POS sales can be attributed correctly.
+      </div>`;
+    pos.forEach(name => {
+      const suggestions = getFuzzySuggestions(name);
+      const topSug = suggestions[0];
+      const fuzzyHtml = topSug
+        ? `Best match: <span class="fuzzy-match">${escHtml(topSug.name)}</span> (${Math.round(topSug.score * 100)}% similar)`
+        : 'No close match found in product library.';
+      const productOpts = S().productMaps.map(p =>
+        `<option value="${p.id}"${topSug && p.id === topSug.id ? ' selected' : ''}>${escHtml(p.name)}</option>`
+      ).join('');
+      html += `<div class="review-row" id="crr-${CSS.escape(name)}">
+        <div class="review-row-name">${escHtml(name)}</div>
+        <div class="review-row-meta">${fuzzyHtml}</div>
+        <div class="review-actions">
+          <select class="pos-product-select" id="cr-sel-${CSS.escape(name)}" style="margin:0;">
+            <option value="">— assign to product —</option>${productOpts}
+          </select>
+          <button class="pos-action-btn" onclick="crAssign('pos','${escHtml(name)}')">✓ Assign</button>
+          <button class="pos-action-btn" onclick="crCreateNew('pos','${escHtml(name)}')">+ New product</button>
+          <button class="pos-action-btn" onclick="crIgnore('${escHtml(name)}')">✕ Ignore</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // ── Inventory items ──
+  if (inv.length) {
+    html += `<div class="review-section">
+      <div class="review-section-title inv">📦 INVENTORY ITEMS — ${inv.length} unpriced</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.7;">
+        These inventory product names have no matching price in your invoice history. Enter a unit cost to enable auto-valuation, or ignore if not applicable.
+      </div>`;
+    inv.forEach(name => {
+      // Try fuzzy match against price history
+      const match = findInventoryUnitCost(name);
+      const matchHint = match.matchType !== 'none'
+        ? `Closest price history match: <span class="fuzzy-match">${escHtml(match.matchKey || '')} — $${match.cost.toFixed(2)}</span> (${Math.round(match.score * 100)}%)`
+        : 'No price found in invoice history. Import an invoice containing this product to auto-populate.';
+      html += `<div class="review-row" id="crr-inv-${CSS.escape(name)}">
+        <div class="review-row-name">${escHtml(name)}</div>
+        <div class="review-row-meta">${matchHint}</div>
+        <div class="review-actions">
+          <input type="number" step="0.01" min="0" placeholder="Unit cost $"
+            id="cr-cost-${CSS.escape(name)}"
+            style="width:100px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:3px;font-size:12px;font-family:var(--mono);"
+            ${match.matchType !== 'none' ? `value="${match.cost.toFixed(2)}"` : ''}>
+          <button class="pos-action-btn" onclick="crSaveInvCost('${escHtml(name)}')">✓ Save cost</button>
+          <button class="pos-action-btn" onclick="crIgnoreInv('${escHtml(name)}')">✕ Ignore</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+// ── Connection review action handlers ──
+
+function crAssign(type, name) {
+  const selId = `cr-sel-${CSS.escape(name)}`;
+  const sel = document.getElementById(selId);
+  const pid = sel ? sel.value : '';
+  if (!pid) { showToast('Pick a product from the dropdown first', true); return; }
+  addAlias(pid, name);
+  // Remove from unresolved
+  if (type === 'pos') {
+    // addAlias handles saving; posItems will resolve next render
+  }
+  const row = document.getElementById(`crr-${CSS.escape(name)}`);
+  if (row) { row.className = 'review-row resolved-assign'; row.style.opacity = '0.5'; setTimeout(() => row.remove(), 600); }
+  updateConnectionsBadge();
+  showToast(`✓ "${name.slice(0, 24)}" assigned`);
+}
+
+function crCreateNew(type, name) {
+  const rootName = guessRootName(name);
+  const entered = prompt(`Create new product for:\n"${name}"\n\nRoot product name:`, rootName);
+  if (!entered || !entered.trim()) return;
+  const aliases = [entered.trim()];
+  if (name.toLowerCase() !== entered.trim().toLowerCase()) aliases.push(name);
+  S().productMaps.push({ id: Date.now().toString(), name: entered.trim(), cat: 'Other', aliases });
+  saveLocal(); scheduleSync(); renderMapping();
+  const row = document.getElementById(`crr-${CSS.escape(name)}`);
+  if (row) { row.className = 'review-row resolved-new'; setTimeout(() => row.remove(), 600); }
+  updateConnectionsBadge();
+  showToast(`✓ "${entered.trim()}" created`);
+}
+
+function crIgnore(name) {
+  if (!S().ignoredPosItems) S().ignoredPosItems = [];
+  if (!S().ignoredPosItems.includes(name)) S().ignoredPosItems.push(name);
+  saveLocal(); scheduleSync();
+  const row = document.getElementById(`crr-${CSS.escape(name)}`);
+  if (row) { row.className = 'review-row resolved-ignore'; setTimeout(() => row.remove(), 800); }
+  updateConnectionsBadge();
+  showToast(`"${name.slice(0,24)}" ignored permanently`);
+}
+
+function crSaveInvCost(name) {
+  const costEl = document.getElementById(`cr-cost-${CSS.escape(name)}`);
+  const cost = parseFloat(costEl?.value || '0');
+  if (!cost || cost <= 0) { showToast('Enter a valid cost first', true); return; }
+  saveInventoryMapping(name, cost, name);
+  // Remove from unresolvedInvItems
+  if (S().unresolvedInvItems) S().unresolvedInvItems = S().unresolvedInvItems.filter(n => n !== name);
+  saveLocal();
+  const row = document.getElementById(`crr-inv-${CSS.escape(name)}`);
+  if (row) { row.className = 'review-row resolved-assign'; setTimeout(() => row.remove(), 600); }
+  updateConnectionsBadge();
+  showToast(`✓ ${name.slice(0,24)} → $${cost.toFixed(2)} saved`);
+}
+
+function crIgnoreInv(name) {
+  if (!S().ignoredPosItems) S().ignoredPosItems = [];
+  if (!S().ignoredPosItems.includes(name)) S().ignoredPosItems.push(name);
+  if (S().unresolvedInvItems) S().unresolvedInvItems = S().unresolvedInvItems.filter(n => n !== name);
+  saveLocal();
+  const row = document.getElementById(`crr-inv-${CSS.escape(name)}`);
+  if (row) { row.className = 'review-row resolved-ignore'; setTimeout(() => row.remove(), 800); }
+  updateConnectionsBadge();
+  showToast(`"${name.slice(0,24)}" ignored`);
+}
+
+function dismissAllResolved() {
+  renderMapping();
+  updateConnectionsBadge();
+  showToast('✓ Connections saved');
+}
 
 // ══════════════════════════════════════════════
 // DASHBOARD
@@ -2369,6 +2649,7 @@ function renderDashboard(){
   renderShrinkageDashboard();
   renderVariance();
   renderDashboardPosReminder();
+  updateConnectionsBadge();
 }
 
 function calcCogsStats(weeks){
@@ -3841,6 +4122,10 @@ function applyInvValuation() {
   updatePreview();
   saveLocal();
   closeInvValModal();
+  // Flag any unpriced items for the connections review
+  const unpricedNames = matchedRows.filter(r => r.matchType === 'none').map(r => r.name);
+  if (unpricedNames.length) flagUnresolvedInvItems(unpricedNames);
+  updateConnectionsBadge();
   showToast(`✓ ${type === 'start' ? 'Start' : 'End'} inventory set to ${fmt$(_grandTotal)}`);
 }
 
@@ -5975,6 +6260,7 @@ function initApp(){
   if(lastSyncTime)document.getElementById('last-sync-time').textContent='Last sync: '+lastSyncTime.toLocaleString();
   switchBar('dh');
   renderAll();
+  updateConnectionsBadge();
   // Clear any stale section collapse state from previous broken versions
   try {
     const s = JSON.parse(localStorage.getItem('pourcost_sec')||'{}');
