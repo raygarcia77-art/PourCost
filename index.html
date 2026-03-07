@@ -710,19 +710,10 @@ input::placeholder{color:var(--muted);}
           <button class="btn btn-primary" id="submit-end-keg-btn" style="width:100%;margin-top:8px;display:none;" onclick="submitKegInventory('end')">✓ Submit End Keg Inventory</button>
         </div>
       </div>
-      <div style="margin-bottom:16px;">
-          <div class="upload-box" id="upload-pos" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:14px;padding:16px 20px;"><input type="file" accept=".csv,.xlsx,.xls" onchange="handlePOSUpload(this)"><div style="font-size:24px;">🖥️</div><div><div class="upload-title">POS Sales Data</div><div class="upload-hint">Toast CSV export</div><div class="upload-status" id="pos-status"></div></div></div>
-          <div id="pos-staged-preview" style="display:none;background:var(--surface);border:1px solid rgba(212,168,67,0.3);border-radius:0 0 6px 6px;padding:10px 12px;margin-top:-2px;font-family:var(--mono);font-size:11px;">
-            <div id="pos-staged-content" style="color:var(--muted);margin-bottom:8px;line-height:1.8;"></div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn btn-primary" style="flex:1;padding:7px;" onclick="applyPOSStaged()">✓ Submit POS Data</button>
-              <button class="btn btn-outline" style="padding:7px 14px;" onclick="cancelPOSStaged()">✕</button>
-            </div>
-          </div>
-        </div>
+
       <!-- Variance upload: single All Levels Product Mix CSV -->
       <div style="margin-bottom:8px;">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">🥃 SPIRIT VARIANCE DATA <span style="color:var(--muted);font-weight:400;">— one file covers everything</span></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">📊 POS SALES DATA &amp; VARIANCE <span style="color:var(--muted);font-weight:400;">— one file fills sales totals + spirit variance</span></div>
         <div class="upload-box" id="upload-all-levels" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:12px;padding:14px 16px;">
           <input type="file" accept=".csv,.zip" onchange="handleAllLevelsUpload(this)">
           <div style="font-size:20px;">📊</div>
@@ -5920,6 +5911,21 @@ function handleAllLevelsUpload(input) {
     setField('entry-sales-beer',    totalBeer);
     setField('entry-sales-wine',    salesTotals.wine);
     updatePreview();
+
+    // Trigger Connections review for any new item names not yet mapped
+    const newItems = Object.keys(result.items);
+    if (newItems.length > 0) {
+      if (!S().posItems) S().posItems = [];
+      newItems.forEach(n => { if (!S().posItems.includes(n)) S().posItems.push(n); });
+      saveLocal();
+      updateConnectionsBadge();
+      const unmatched = newItems.filter(n => !resolveProduct(n) && !(S().ignoredPosItems||[]).includes(n));
+      if (unmatched.length > 0 && S().productMaps.length > 0) {
+        openPosReviewModal(newItems);
+      } else if (unmatched.length > 0) {
+        showToast(`⚠ ${unmatched.length} new items need connecting — see Connections tab`);
+      }
+    }
 
     const liquor  = Object.values(result.items).filter(v => v.salesCat === 'Liquor').length;
     const beer    = Object.values(result.items).filter(v => ['Draft Beer','Bottled Beer'].includes(v.salesCat)).length;
