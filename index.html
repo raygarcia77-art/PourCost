@@ -1350,7 +1350,7 @@ input::placeholder{color:var(--muted);}
           style="width:100%;height:220px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:12px;border-radius:6px;resize:vertical;line-height:1.6;">You are an invoice scanner for a bar/restaurant. Extract all purchased product line items from this beverage distributor invoice image.
 
 VENDORS YOU WILL SEE:
-- Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. The PRICE column is the per-unit price after deposit (use this). AMOUNT = total. Skip lines with "EMPTY KEG", "POS", "MISCELLANEOUS".
+- Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. UPRICE = actual product cost before deposit — USE THIS as unitCost. DEP = keg deposit (ignore). PRICE = UPRICE + DEP (do NOT use). AMOUNT = total including deposit (do NOT use). For kegs: unitCost = UPRICE, total = UPRICE × qty. Skip ALL lines where DESCRIPTION contains "EMPTY KEG", "POS", "MISCELLANEOUS", or QTY is negative.
 - Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
 - Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
 - Southern Glazer's: columns LOC CASES BTLS SIZE DESCRIPTION PACK NET BTL PRICE UNIT PRICE DIV CDE UNIT DISCOUNT NET AMOUNT. UNIT PRICE = per bottle price. NET AMOUNT = line total. Skip "COOK COUNTY ALCOHOL TAX", "CHICAGO ALCOHOL EXCISE TAX", "DELIVERY CHARGE" lines — these are tax rows not products.
@@ -1629,7 +1629,13 @@ LAKESHORE BEVERAGE - COLUMNS: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC 
 - Kegs: "BUSCH LT" + "1/2 BBL" below → item="BUSCH LT 1/2 BBL", qty=QTY
 - unitCost=D.Price (excludes deposit). total=D.Price×qty. Skip EMPTY lines.
 
-CHICAGO BEVERAGE SYSTEMS: PRICE=per-unit. AMOUNT=line total. Skip EMPTY KEG, POS, MISCELLANEOUS.
+CHICAGO BEVERAGE SYSTEMS (CBS / Sipmarket) - COLUMNS: ITEM# | QTY | DESCRIPTION | UPC | UPRICE | DISC | DEP | PRICE | AMOUNT
+- UPRICE = actual product cost BEFORE deposit. USE THIS as unitCost.
+- DEP = keg deposit added on top (do NOT include in unitCost).
+- PRICE = UPRICE + DEP combined (do NOT use — it includes deposit).
+- AMOUNT = line total including deposit (do NOT use).
+- For kegs: unitCost = UPRICE (e.g. 196.00 not 226.00), total = UPRICE × qty.
+- Skip ALL lines where DESCRIPTION contains "EMPTY KEG", "POS", or "MISCELLANEOUS", or where QTY is negative.
 
 RULES:
 1. Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
