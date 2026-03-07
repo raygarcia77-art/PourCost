@@ -5939,101 +5939,78 @@ function handleAllLevelsUpload(input) {
   };
 
   if (file.name.toLowerCase().endsWith('.zip')) {
-    // Pure JS zip reader — no external dependencies
-    // Uses browser-native DecompressionStream (deflate-raw) for DEFLATE entries
     const reader = new FileReader();
-    reader.onload = async e => {
+    reader.onload = e => {
       try {
-        const buf   = e.target.result;
-        const bytes = new Uint8Array(buf);
-        const view  = new DataView(buf);
-
-        // Read a null-terminated or length-prefixed string from bytes
-        const readStr = (offset, len) => {
-          let s = '';
-          for (let i = 0; i < len; i++) s += String.fromCharCode(bytes[offset + i]);
-          return s;
-        };
-
-        // Find End-of-Central-Directory record (signature 0x06054b50)
-        let eocdOffset = -1;
-        for (let i = bytes.length - 22; i >= 0; i--) {
-          if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
+        // Use SheetJS (already loaded) to read zip — it has a built-in zip reader
+        const data = new Uint8Array(e.target.result);
+        const zip  = XLSX.CFB.read(data, {type:'array'});
+        // CFB storage entries — find All levels.csv
+        const entry = zip.FileIndex.find(f => f.name.toLowerCase().replace(/\s+/g,' ').trim() === 'all levels.csv')
+                   || zip.FileIndex.find(f => f.name.toLowerCase().includes('all level'));
+        if (!entry) {
+          // Try raw zip approach with XLSX.zip_to_files
+          throw new Error('"All levels.csv" not found — try uploading the CSV directly instead of the zip');
         }
-        if (eocdOffset < 0) throw new Error('Not a valid zip file');
-
-        const cdOffset = view.getUint32(eocdOffset + 16, true);
-        const cdCount  = view.getUint16(eocdOffset + 10, true);
-
-        // Parse central directory to find "All levels.csv"
-        let cdPos = cdOffset;
-        let targetLocalOffset = -1;
-        let targetCompSize = 0, targetOrigSize = 0, targetMethod = 0;
-
-        for (let i = 0; i < cdCount; i++) {
-          if (view.getUint32(cdPos, true) !== 0x02014b50) break;
-          const method     = view.getUint16(cdPos + 10, true);
-          const compSize   = view.getUint32(cdPos + 20, true);
-          const origSize   = view.getUint32(cdPos + 24, true);
-          const fnLen      = view.getUint16(cdPos + 28, true);
-          const extraLen   = view.getUint16(cdPos + 30, true);
-          const commentLen = view.getUint16(cdPos + 32, true);
-          const localOffset= view.getUint32(cdPos + 42, true);
-          const fname      = readStr(cdPos + 46, fnLen);
-
-          if (fname.toLowerCase().replace(/\s+/g,' ').trim() === 'all levels.csv') {
-            targetLocalOffset = localOffset;
-            targetCompSize    = compSize;
-            targetOrigSize    = origSize;
-            targetMethod      = method;
-          }
-          cdPos += 46 + fnLen + extraLen + commentLen;
-        }
-
-        if (targetLocalOffset < 0) throw new Error('"All levels.csv" not found in zip');
-
-        // Read local file header to find data offset
-        if (view.getUint32(targetLocalOffset, true) !== 0x04034b50) throw new Error('Bad local header');
-        const localFnLen    = view.getUint16(targetLocalOffset + 26, true);
-        const localExtraLen = view.getUint16(targetLocalOffset + 28, true);
-        const dataStart     = targetLocalOffset + 30 + localFnLen + localExtraLen;
-
-        const compData = bytes.slice(dataStart, dataStart + targetCompSize);
-
-        let text;
-        if (targetMethod === 0) {
-          // Stored (no compression)
-          text = new TextDecoder('utf-8').decode(compData);
-        } else if (targetMethod === 8) {
-          // DEFLATE — use browser-native DecompressionStream
-          const ds     = new DecompressionStream('deflate-raw');
-          const writer = ds.writable.getWriter();
-          const reader2= ds.readable.getReader();
-          writer.write(compData);
-          writer.close();
-          const chunks = [];
-          while (true) {
-            const { done, value } = await reader2.read();
-            if (done) break;
-            chunks.push(value);
-          }
-          const total = chunks.reduce((s,c) => s + c.length, 0);
-          const merged = new Uint8Array(total);
-          let off = 0;
-          for (const c of chunks) { merged.set(c, off); off += c.length; }
-          text = new TextDecoder('utf-8').decode(merged);
-        } else {
-          throw new Error('Unsupported compression method: ' + targetMethod);
-        }
-
+        const text = new TextDecoder('utf-8').decode(entry.content);
         processText(text, file.name);
       } catch(err) {
-        console.error('Zip parse error:', err);
-        statusEl.textContent = '⚠ ' + (err.message || 'Could not read zip');
-        showToast('Zip error: ' + (err.message||'unknown'), true);
+        // Fallback: try XLSX zip util
+        try {
+          const ab   = e.target.result;
+          const zarr = new Uint8Array(ab);
+          // Manual zip: scan for local file headers (PK\x03\x04)
+          const entries = [];
+          let pos = 0;
+          while (pos < zarr.length - 4) {
+            if (zarr[pos]===0x50 && zarr[pos+1]===0x4B && zarr[pos+2]===0x03 && zarr[pos+3]===0x04) {
+              const fnLen    = zarr[pos+26] | (zarr[pos+27]<<8);
+              const extraLen = zarr[pos+28] | (zarr[pos+29]<<8);
+              const compSize = zarr[pos+18] | (zarr[pos+19]<<8) | (zarr[pos+20]<<16) | (zarr[pos+21]<<24);
+              const method   = zarr[pos+8]  | (zarr[pos+9]<<8);
+              const fname    = new TextDecoder().decode(zarr.slice(pos+30, pos+30+fnLen));
+              const dataStart= pos+30+fnLen+extraLen;
+              if (fname.toLowerCase().replace(/\s+/g,' ').trim() === 'all levels.csv') {
+                if (method === 0) {
+                  // Stored
+                  const text = new TextDecoder('utf-8').decode(zarr.slice(dataStart, dataStart+compSize));
+                  processText(text, file.name); return;
+                } else if (method === 8 && typeof pako !== 'undefined') {
+                  const text = new TextDecoder('utf-8').decode(pako.inflateRaw(zarr.slice(dataStart, dataStart+compSize)));
+                  processText(text, file.name); return;
+                } else {
+                  // Load pako for deflate
+                  const compressed = zarr.slice(dataStart, dataStart+compSize);
+                  const s = document.createElement('script');
+                  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
+                  s.onload = () => {
+                    try {
+                      const text = new TextDecoder('utf-8').decode(pako.inflateRaw(compressed));
+                      processText(text, file.name);
+                    } catch(e2) {
+                      statusEl.textContent = '⚠ Decompression failed — please upload the CSV directly';
+                      showToast('Upload the CSV file directly instead of the zip', true);
+                    }
+                  };
+                  s.onerror = () => {
+                    statusEl.textContent = '⚠ Could not decompress zip — upload the CSV file directly';
+                    showToast('Upload All levels.csv directly (not the zip)', true);
+                  };
+                  document.head.appendChild(s); return;
+                }
+              }
+              pos = dataStart + Math.max(0, compSize);
+            } else { pos++; }
+          }
+          statusEl.textContent = '⚠ Could not find All levels.csv — upload the CSV file directly';
+          showToast('Upload All levels.csv directly from inside the zip', true);
+        } catch(err2) {
+          console.error('Zip error:', err2);
+          statusEl.textContent = '⚠ Could not read zip — upload the CSV file directly';
+          showToast('Tip: open the zip and upload All levels.csv directly', true);
+        }
       }
     };
-    reader.onerror = () => { statusEl.textContent = '⚠ FileReader error'; };
     reader.readAsArrayBuffer(file);
   } else {
     const reader = new FileReader();
