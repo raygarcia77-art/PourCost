@@ -1352,7 +1352,7 @@ input::placeholder{color:var(--muted);}
 VENDORS YOU WILL SEE:
 - Chicago Beverage Systems (CBS / Sipmarket): columns ITEM# QTY DESCRIPTION UPC UPRICE DISC DEP PRICE AMOUNT. UPRICE = actual product cost before deposit — USE THIS as unitCost. DEP = keg deposit (ignore). PRICE = UPRICE + DEP (do NOT use). AMOUNT = total including deposit (do NOT use). For kegs: unitCost = UPRICE, total = UPRICE × qty. Skip ALL lines where DESCRIPTION contains "EMPTY KEG", "POS", "MISCELLANEOUS", or QTY is negative.
 - Lakeshore Beverage: columns ITEM# QTY DESCRIPTION U.P.C. PRICE DISC D.Price DEP EXT. D.Price = discounted unit price (use this). EXT = total. Skip "EMPTY MSTAR" deposit lines.
-- Breakthru Beverage: columns Case Btles Item Size BPC Description CS Price CS Disc CS Net Cnty Tax City Tax Ext W/O Tax. CS Net = net case price. Ext W/O Tax = line total (use this). Skip "Service Fee" lines.
+- Breakthru Beverage: columns Case | Btles | Item# | Size | BPC | CS Net | Ext W/O Tax. Case column has number = case order: qty=Case×BPC, unitCost=CS Net÷BPC, total=Ext W/O Tax. Btles column has number = bottle order: qty=Btles, unitCost=Ext W/O Tax÷Btles, total=Ext W/O Tax. Skip Service Fee lines.
 - Southern Glazer's: CS ORD/DLV and BTLS ORD/DLV columns — only one has a number per item. CS mode: UNIT NET = per-case price, unitCost = UNIT NET ÷ BPC, qty = CS × BPC. BTLS mode: UNIT NET = per-bottle price already, unitCost = UNIT NET directly, qty = BTLS. Verify mode by checking: if UNIT NET × BTLS = TOTAL it is BTLS mode; if UNIT NET × CS × BPC ≈ TOTAL it is CS mode. Skip COOK COUNTY ALCOHOL TAX, CHICAGO ALCOHOL EXCISE TAX, DELIVERY CHARGE lines.
 
 RULES:
@@ -1626,10 +1626,24 @@ TO DETERMINE THE MODE: check whether the number appears in the CS column or the 
 
 ALL ITEMS: Skip COOK COUNTY ALCOHOL TAX lines, CHICAGO ALCOHOL EXCISE TAX lines, and DELIVERY CHARGE lines entirely.
 
-BREAKTHRU BEVERAGE - COLUMNS: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax
-- Case column has number = ordered by case: qty = Case × BPC, unitCost = Ext W/O Tax / qty
-- Btles column has number = ordered as bottles: qty = Btles, unitCost = Ext W/O Tax / qty
-- total = Ext W/O Tax. Skip Service Fee lines.
+BREAKTHRU BEVERAGE - COLUMNS: Case | Btles | Item# | Size | BPC | Description | CS Price | CS Disc | CS Net | Cnty Tax | City Tax | Ext W/O Tax | SLP | Deal
+
+TWO ORDERING MODES — determined by which of the first two columns has a number:
+
+MODE 1 — Case column has a number (Btles is blank):
+- qty = Case × BPC (total individual units)
+- unitCost = CS Net ÷ BPC (per unit cost)
+- total = Ext W/O Tax
+- Example: Case=2, BPC=24, CS Net=48.00, Ext=96.00 → HIGH NOON: qty=48, unitCost=$2.00/can, total=96.00
+- Example: Case=2, BPC=24, CS Net=42.25, Ext=84.50 → RED BULL: qty=48, unitCost=$1.76/can, total=84.50
+
+MODE 2 — Btles column has a number (Case is blank):
+- qty = Btles number
+- unitCost = Ext W/O Tax ÷ Btles (per bottle cost)
+- total = Ext W/O Tax
+- Example: Btles=1, BPC=6, CS Net=57.29, Ext=57.29 → WOODFORD RESERVE: qty=1, unitCost=$57.29/btl, total=57.29
+
+Skip Service Fee lines and any $0.00 lines.
 
 LAKESHORE BEVERAGE - COLUMNS: ITEM# | QTY | DESCRIPTION | U.P.C. | PRICE | DISC | D.Price | DEP | EXT
 - Append descriptor line below item name to item name.
