@@ -720,8 +720,35 @@ input::placeholder{color:var(--muted);}
             </div>
           </div>
         </div>
-      <div style="margin-bottom:16px;">
-        <div class="upload-box" id="upload-modifier" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:14px;padding:16px 20px;"><input type="file" accept=".csv,.zip" onchange="handleProductMixUpload(this)"><div style="font-size:24px;">🥃</div><div><div class="upload-title">Product Mix Report</div><div class="upload-hint">Toast — Product Mix export (.zip or Items.csv)</div><div class="upload-status" id="modifier-status"></div></div></div>
+      <!-- Variance uploads: paired Items.csv + Modifier Detail -->
+      <div style="margin-bottom:8px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">🥃 SPIRIT VARIANCE DATA <span style="color:var(--muted);font-weight:400;">— upload both for exact oz tracking</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <div class="upload-box" id="upload-items-csv" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:12px;padding:14px 16px;">
+              <input type="file" accept=".csv,.zip" onchange="handleItemsUpload(this)">
+              <div style="font-size:20px;">📊</div>
+              <div>
+                <div class="upload-title" style="font-size:12px;">Product Mix Report</div>
+                <div class="upload-hint">Toast → Items.csv or .zip export</div>
+                <div class="upload-status" id="items-csv-status"></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="upload-box" id="upload-modifier-detail" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:12px;padding:14px 16px;">
+              <input type="file" accept=".csv" onchange="handleModifierDetailUpload(this)">
+              <div style="font-size:20px;">🔬</div>
+              <div>
+                <div class="upload-title" style="font-size:12px;">Modifier Detail Report</div>
+                <div class="upload-hint">Toast → Item Modifier Selection Details</div>
+                <div class="upload-status" id="modifier-detail-status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Pair validation banner -->
+        <div id="variance-pair-banner" style="display:none;margin-top:6px;padding:8px 12px;border-radius:4px;font-family:var(--mono);font-size:10px;line-height:1.7;"></div>
       </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title">PERIOD ENTRY</div></div>
@@ -1477,7 +1504,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{}, unresolvedInvItems:[], modifierData:{} };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{}, unresolvedInvItems:{}, pourMappings:{}, productMixData:{} };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -5703,178 +5730,402 @@ function closeActionReport() {
   document.getElementById('action-report-overlay').style.display = 'none';
 }
 
-// ══════════════════════════════════════════════
-// PRODUCT MIX REPORT PARSER  (Toast Items.csv)
-// Handles both raw Items.csv and the .zip export
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// SPIRIT VARIANCE ENGINE — v2
+// Three data sources that never overlap:
+//   1. Modifier Detail CSV  → exact oz per spirit (direct pours only)
+//   2. Items.csv            → cocktail qty + packaged beer qty
+//   3. Menu Costing recipes → cocktail → ingredient attribution
+// pourMappings             → well spirit / name bridge + active size
+// ══════════════════════════════════════════════════════════════════
 
-// Parse Toast Items.csv → { itemName: { salesCat, qtySold, voidAmt } }
-function parseProductMixCSV(text) {
+const OZ_PER_BOTTLE    = { '1750':59.17, '1000':33.81, '750':25.36, '375':12.68 };
+const DEFAULT_POUR_OZ  = 1.5;   // fallback when no modifier data
+
+// ── Date range extraction from Toast CSV header rows ──
+function extractToastDateRange(text) {
+  // Toast CSVs often have a date range in early rows like "2/23/2026 - 3/1/2026"
+  const lines = text.split('\n').slice(0, 10);
+  for (const line of lines) {
+    const m = line.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\s*[-–to]+\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
+    if (m) return { start: m[1].trim(), end: m[2].trim(), raw: m[0].trim() };
+  }
+  // Also check filename pattern already stored on the object
+  return null;
+}
+
+function extractDateRangeFromFilename(filename) {
+  // e.g. ItemModifierSelectionDetails_2026_02_23-2026_03_01.csv
+  // or   ProductMix_2026-02-23_2026-03-01.zip
+  const m = filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})[-_]+(\d{4}[-_]\d{2}[-_]\d{2})/);
+  if (m) return { start: m[1].replace(/_/g,'-'), end: m[2].replace(/_/g,'-'), raw: `${m[1]} → ${m[2]}` };
+  return null;
+}
+
+function dateRangesMatch(rangeA, rangeB) {
+  if (!rangeA || !rangeB) return null; // unknown
+  // Normalise separators and compare loosely
+  const norm = s => s.replace(/[_\/]/g,'-').trim();
+  return norm(rangeA.start) === norm(rangeB.start) && norm(rangeA.end) === norm(rangeB.end);
+}
+
+// ── Parse Toast Items.csv → { itemName: { salesCat, qtySold, voidAmt } } ──
+function parseItemsCSV(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return null;
-
-  const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
-  const col = k => headers.findIndex(h => h.includes(k));
-
-  const colItem    = col('item');
-  const colCat     = headers.findIndex(h => h === 'sales category' || h.includes('sales cat'));
-  const colQty     = headers.findIndex(h => h === 'qty sold' || h === 'qty');
-  const colVoid    = headers.findIndex(h => h.includes('void amount'));
-
+  // Skip header lines that don't look like column headers
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    if (lines[i].toLowerCase().includes('qty sold') || lines[i].toLowerCase().includes('item')) {
+      headerIdx = i; break;
+    }
+  }
+  const headers = parseCsvLine(lines[headerIdx]).map(h => h.toLowerCase().replace(/"/g,'').trim());
+  const ci = k => headers.findIndex(h => h.includes(k));
+  const colItem = ci('item');
+  const colCat  = headers.findIndex(h => h === 'sales category' || h.includes('sales cat'));
+  const colQty  = headers.findIndex(h => h === 'qty sold' || h === 'qty');
+  const colVoid = ci('void amount');
   if (colItem < 0 || colQty < 0) return null;
 
   const result = {};
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerIdx + 1; i < lines.length; i++) {
     const row = parseCsvLine(lines[i]);
     if (!row || row.length < 3) continue;
-    const name    = (row[colItem] || '').replace(/^"|"$/g,'').trim();
-    const salesCat = colCat >= 0 ? (row[colCat] || '').replace(/^"|"$/g,'').trim() : '';
-    const qty     = parseFloat((row[colQty] || '0').replace(/^"|"$/g,'')) || 0;
+    const name    = (row[colItem]||'').replace(/^"|"$/g,'').trim();
+    const salesCat = colCat >= 0 ? (row[colCat]||'').replace(/^"|"$/g,'').trim() : '';
+    const qty     = parseFloat((row[colQty]||'0').replace(/^"|"$/g,''))||0;
     const voidAmt = colVoid >= 0 ? parseFloat((row[colVoid]||'0').replace(/^"|"$/g,''))||0 : 0;
-    if (!name || name === '') continue;
+    if (!name) continue;
     result[name] = { salesCat, qtySold: qty, voidAmt };
   }
   return Object.keys(result).length > 0 ? result : null;
 }
 
-// Handle upload — accepts .csv directly or .zip containing Items.csv
-function handleProductMixUpload(input) {
-  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
-  const file = input.files[0];
-  if (!file) return;
+// ── Parse Toast Modifier Detail CSV → { spiritNameLower: { name, totalOz, breakdown:[{modifier,oz,qty}] } } ──
+function parseModifierDetailCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+  const headers = parseCsvLine(lines[0]).map(h => h.replace(/"/g,'').toLowerCase().trim());
+  const colMod    = headers.findIndex(h => h === 'modifier');
+  const colGroup  = headers.findIndex(h => h.includes('option group') || h.includes('group name'));
+  const colParent = headers.findIndex(h => h.includes('parent'));
+  const colQty    = headers.findIndex(h => h === 'qty');
+  const colVoid   = headers.findIndex(h => h.includes('void') && !h.includes('reason'));
+  if (colMod < 0 || colParent < 0 || colQty < 0) return null;
 
-  const statusEl = document.getElementById('modifier-status');
-  const boxEl    = document.getElementById('upload-modifier');
-  statusEl.textContent = 'Reading...';
-
-  const processCSV = (text, filename) => {
-    const result = parseProductMixCSV(text);
-    if (!result) {
-      statusEl.textContent = '⚠ Could not parse — check file format';
-      showToast('Could not parse Product Mix report', true);
-      return;
-    }
-    const liquorItems = Object.entries(result).filter(([,v]) =>
-      v.salesCat === 'Liquor' || v.salesCat === 'Draft Beer' || v.salesCat === 'Bottled Beer'
-    );
-    const periodKey = document.getElementById('entry-start-date').value || 'latest';
-    if (!S().modifierData) S().modifierData = {};
-    S().modifierData[periodKey] = {
-      uploadedAt: new Date().toISOString(),
-      filename,
-      data: result
-    };
-    saveLocal();
-    const spiritCount = liquorItems.filter(([,v]) => v.salesCat === 'Liquor').length;
-    const beerCount   = liquorItems.filter(([,v]) => v.salesCat !== 'Liquor').length;
-    statusEl.textContent = `✓ ${spiritCount} spirit/cocktail items · ${beerCount} beer items`;
-    boxEl.classList.add('loaded');
-    showToast(`✓ Product Mix loaded — ${liquorItems.length} beverage items`);
+  // Normalise size modifier text → oz
+  const modToOz = t => {
+    t = (t||'').toLowerCase().trim();
+    const m = t.match(/^(\d+(?:\.\d+)?)\s*oz/); if (m) return parseFloat(m[1]);
+    if (/^double/.test(t)) return 2.0;
+    if (/^triple/.test(t)) return 3.0;
+    if (/margarita|martini|sour|cosmopolitan|manhattan|negroni/.test(t)) return 1.5;
+    return null;
   };
 
-  if (file.name.endsWith('.zip')) {
-    // Use JSZip if available, else instruct user to upload Items.csv directly
-    if (typeof JSZip === 'undefined') {
-      // Load JSZip dynamically
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-      script.onload = () => {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const zip = await JSZip.loadAsync(e.target.result);
-            const itemsFile = zip.file('Items.csv') || zip.file(/Items\.csv$/i)[0];
-            if (!itemsFile) { statusEl.textContent = '⚠ Items.csv not found in zip'; return; }
-            const text = await itemsFile.async('string');
-            processCSV(text, file.name);
-          } catch(err) { statusEl.textContent = '⚠ Could not read zip file'; }
-        };
-        reader.readAsArrayBuffer(file);
-      };
-      document.head.appendChild(script);
-    } else {
+  const bySpirit = {};
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCsvLine(lines[i]);
+    if (!row || row.length < 4) continue;
+    const modifier = (row[colMod]||'').replace(/"/g,'').trim();
+    const group    = colGroup >= 0 ? (row[colGroup]||'').replace(/"/g,'').trim() : '';
+    const parent   = (row[colParent]||'').replace(/"/g,'').trim();
+    const qty      = parseFloat((row[colQty]||'0').replace(/"/g,''))||0;
+    const isVoid   = colVoid >= 0 ? (row[colVoid]||'').replace(/"/g,'').toLowerCase()==='true' : false;
+    if (isVoid || qty <= 0 || !parent) continue;
+
+    const isSizeGroup  = group.toLowerCase() === 'size';
+    const isDrinkMod   = group.toLowerCase().includes('drink modifier') || group.toLowerCase().includes('$ drink');
+    if (!isSizeGroup && !isDrinkMod) continue;
+
+    const oz = modToOz(modifier);
+    if (!oz) continue;
+
+    // Skip cocktail/menu item parents — modifier detail only tracks direct spirit pours
+    // A direct spirit pour parent = something in the Items.csv Liquor category (matched later)
+    const k = parent.toLowerCase().trim();
+    if (!bySpirit[k]) bySpirit[k] = { name: parent, totalOz: 0, breakdown: [], hasData: true };
+    bySpirit[k].totalOz += oz * qty;
+    bySpirit[k].breakdown.push({ modifier, oz, qty });
+  }
+  return Object.keys(bySpirit).length > 0 ? bySpirit : null;
+}
+
+// ── Handle Items.csv upload (or .zip) ──
+function handleItemsUpload(input) {
+  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
+  const file = input.files[0]; if (!file) return;
+  const statusEl = document.getElementById('items-csv-status');
+  statusEl.textContent = 'Reading...';
+
+  const processText = (text, filename) => {
+    const result = parseItemsCSV(text);
+    if (!result) { statusEl.textContent = '⚠ Could not parse'; showToast('Could not parse Items.csv', true); return; }
+    const dateRange = extractToastDateRange(text) || extractDateRangeFromFilename(filename);
+    if (!S().productMixData) S().productMixData = {};
+    S().productMixData.items     = result;
+    S().productMixData.itemsFile = filename;
+    S().productMixData.itemsRange = dateRange;
+    S().productMixData.itemsAt   = new Date().toISOString();
+    saveLocal();
+    const liquor = Object.values(result).filter(v => v.salesCat === 'Liquor').length;
+    const beer   = Object.values(result).filter(v => v.salesCat === 'Bottled Beer').length;
+    statusEl.textContent = `✓ ${liquor} liquor · ${beer} bottled beer items`;
+    document.getElementById('upload-items-csv').classList.add('loaded');
+    validateVariancePair();
+    showToast(`✓ Items.csv loaded — ${liquor + beer} beverage items`);
+  };
+
+  if (file.name.toLowerCase().endsWith('.zip')) {
+    const loadAndProcess = () => {
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = async e => {
         try {
           const zip = await JSZip.loadAsync(e.target.result);
-          const itemsFile = zip.file('Items.csv') || zip.file(/Items\.csv$/i)[0];
-          if (!itemsFile) { statusEl.textContent = '⚠ Items.csv not found in zip'; return; }
-          const text = await itemsFile.async('string');
-          processCSV(text, file.name);
-        } catch(err) { statusEl.textContent = '⚠ Could not read zip file'; }
+          const f = zip.file('Items.csv') || (zip.file(/Items\.csv$/i)||[])[0];
+          if (!f) { statusEl.textContent = '⚠ Items.csv not found in zip'; return; }
+          processText(await f.async('string'), file.name);
+        } catch(err) { statusEl.textContent = '⚠ Could not read zip'; }
       };
       reader.readAsArrayBuffer(file);
-    }
+    };
+    if (typeof JSZip === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+      s.onload = loadAndProcess; document.head.appendChild(s);
+    } else loadAndProcess();
   } else {
     const reader = new FileReader();
-    reader.onload = (e) => processCSV(e.target.result, file.name);
+    reader.onload = e => processText(e.target.result, file.name);
     reader.readAsText(file);
   }
 }
 
-// ══════════════════════════════════════════════
-// SPIRIT CONSUMPTION ENGINE
-// Calculates expected oz consumed per spirit by combining:
-//   1. Direct spirit sales (Jameson sold 4 × pour size)
-//   2. Cocktail sales routed through Menu Costing recipes
-// Returns: { spiritNameLower: { name, ozConsumed, sources:[{via, qty, oz}] } }
-// ══════════════════════════════════════════════
+// ── Handle Modifier Detail upload ──
+function handleModifierDetailUpload(input) {
+  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
+  const file = input.files[0]; if (!file) return;
+  const statusEl = document.getElementById('modifier-detail-status');
+  statusEl.textContent = 'Reading...';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text   = e.target.result;
+    const result = parseModifierDetailCSV(text);
+    if (!result) { statusEl.textContent = '⚠ Could not parse'; showToast('Could not parse Modifier Detail', true); return; }
+    const dateRange = extractToastDateRange(text) || extractDateRangeFromFilename(file.name);
+    if (!S().productMixData) S().productMixData = {};
+    S().productMixData.modifiers      = result;
+    S().productMixData.modifiersFile  = file.name;
+    S().productMixData.modifiersRange = dateRange;
+    S().productMixData.modifiersAt    = new Date().toISOString();
+    saveLocal();
+    const spirits = Object.keys(result).length;
+    const totalOz = Object.values(result).reduce((s,v) => s + v.totalOz, 0);
+    statusEl.textContent = `✓ ${spirits} spirits · ${totalOz.toFixed(1)} oz tracked`;
+    document.getElementById('upload-modifier-detail').classList.add('loaded');
+    validateVariancePair();
+    showToast(`✓ Modifier Detail loaded — ${spirits} spirits`);
+  };
+  reader.readAsText(file);
+}
 
-const OZ_PER_BOTTLE = { '1750': 59.17, '1000': 33.81, '750': 25.36, '375': 12.68 };
+// ── Validate that both files are uploaded and date ranges match ──
+function validateVariancePair() {
+  const d   = S().productMixData || {};
+  const banner = document.getElementById('variance-pair-banner');
+  if (!banner) return;
+  const hasItems = !!d.items;
+  const hasMods  = !!d.modifiers;
 
-function buildSpiritConsumption(salesData, menuItems) {
-  const consumption = {}; // key: lowercased spirit name
+  if (!hasItems && !hasMods) { banner.style.display = 'none'; return; }
 
-  const addOz = (spiritName, oz, source) => {
-    const k = spiritName.toLowerCase().trim();
-    if (!consumption[k]) consumption[k] = { name: spiritName, ozConsumed: 0, sources: [] };
-    consumption[k].ozConsumed += oz;
-    consumption[k].sources.push(source);
+  const match = hasItems && hasMods ? dateRangesMatch(d.itemsRange, d.modifiersRange) : null;
+
+  if (hasItems && hasMods && match !== false) {
+    banner.style.display = 'block';
+    banner.style.background = 'rgba(39,174,96,0.1)';
+    banner.style.border = '1px solid rgba(39,174,96,0.3)';
+    banner.style.color = '#27ae60';
+    banner.innerHTML = `✓ Both files loaded${d.itemsRange ? ` · ${d.itemsRange.raw}` : ''} — ready for variance report`;
+  } else if (hasItems && hasMods && match === false) {
+    banner.style.display = 'block';
+    banner.style.background = 'rgba(192,57,43,0.1)';
+    banner.style.border = '1px solid rgba(192,57,43,0.3)';
+    banner.style.color = '#e74c3c';
+    banner.innerHTML = `⚠ DATE RANGE MISMATCH — Items: ${d.itemsRange?.raw||'unknown'} &nbsp;·&nbsp; Modifiers: ${d.modifiersRange?.raw||'unknown'}<br>Variance will be inaccurate. Make sure both reports cover the same period.`;
+  } else if (hasItems && !hasMods) {
+    banner.style.display = 'block';
+    banner.style.background = 'rgba(192,132,26,0.1)';
+    banner.style.border = '1px solid rgba(192,132,26,0.3)';
+    banner.style.color = '#c0841a';
+    banner.innerHTML = `⚠ Missing Modifier Detail — direct spirit pours will use ${DEFAULT_POUR_OZ}oz default (estimated). Upload Modifier Detail for exact oz tracking.`;
+  } else if (!hasItems && hasMods) {
+    banner.style.display = 'block';
+    banner.style.background = 'rgba(192,132,26,0.1)';
+    banner.style.border = '1px solid rgba(192,132,26,0.3)';
+    banner.style.color = '#c0841a';
+    banner.innerHTML = `⚠ Missing Product Mix (Items.csv) — cocktail and beer sales unavailable.`;
+  }
+}
+
+// ── Pour mapping helpers (well spirit / name bridge) ──
+// pourMappings[spiritNameLower] = { posName, activeSize, ignoredSizes:[] }
+function getPourMapping(spiritName) {
+  return (S().pourMappings || {})[spiritName.toLowerCase().trim()] || null;
+}
+
+// ── Resolve which Items.csv entry a spirit name maps to ──
+// Checks: exact match → pourMapping posName → fuzzy
+function resolveItemsEntry(spiritName, itemsData) {
+  if (!itemsData) return null;
+  const k = spiritName.toLowerCase().trim();
+  // 1. Exact match
+  const exact = Object.keys(itemsData).find(n => n.toLowerCase().trim() === k);
+  if (exact) return { key: exact, entry: itemsData[exact] };
+  // 2. Pour mapping override
+  const pm = getPourMapping(spiritName);
+  if (pm && pm.posName) {
+    const mapped = Object.keys(itemsData).find(n => n.toLowerCase().trim() === pm.posName.toLowerCase().trim());
+    if (mapped) return { key: mapped, entry: itemsData[mapped] };
+  }
+  // 3. Fuzzy
+  let best = null, bestScore = 0;
+  Object.keys(itemsData).forEach(n => {
+    const s = similarity(spiritName, n);
+    if (s > bestScore && s >= 0.5) { bestScore = s; best = n; }
+  });
+  return best ? { key: best, entry: itemsData[best], fuzzy: true, score: bestScore } : null;
+}
+
+// ── Main consumption builder ──
+// Returns array of consumption objects, one per spirit/ingredient in depletion
+// { spiritName, ozFromDirect, ozFromCocktails, totalOz, directSource, cocktailSources[], hasModifierData, estimatedDirect }
+function buildConsumptionMap(depletions, itemsData, modifierData, menuItems) {
+  // Step 1: Build cocktail consumption map from Items.csv × recipes
+  // { ingredientNameLower: { name, totalOz, sources:[{cocktailName, qty, ozEach}] } }
+  const cocktailOz = {};
+  const addCocktailOz = (ingName, oz, source) => {
+    const k = ingName.toLowerCase().trim();
+    if (!cocktailOz[k]) cocktailOz[k] = { name: ingName, totalOz: 0, sources: [] };
+    cocktailOz[k].totalOz += oz;
+    cocktailOz[k].sources.push(source);
   };
 
-  // Standard pour size for direct spirit sales (when rung as the spirit itself)
-  // The Items.csv qty = number of times rung — each ring is 1 pour
-  // Default pour is 1.5oz (most common well/call pour); can be overridden by recipe
-  const DEFAULT_POUR_OZ = 1.5;
+  if (itemsData && menuItems) {
+    Object.entries(itemsData).forEach(([itemName, item]) => {
+      if (item.salesCat !== 'Liquor') return;
+      const qty = item.qtySold || 0;
+      if (qty <= 0) return;
 
-  Object.entries(salesData).forEach(([itemName, item]) => {
-    if (item.salesCat !== 'Liquor') return;
-    const qty = item.qtySold || 0;
-    if (qty <= 0) return;
+      // Find matching recipe — only route through recipe if it's clearly a cocktail
+      // (has multiple ingredients OR ingredient name ≠ item name)
+      const recipe = menuItems.find(m => similarity(m.name, itemName) >= 0.7);
+      if (!recipe || !recipe.ingredients || !recipe.ingredients.length) return;
 
-    // Try to find a recipe for this item in Menu Costing
-    const recipe = menuItems.find(m => similarity(m.name, itemName) >= 0.7);
+      // Check: is this a direct spirit entry with a recipe, or a real cocktail?
+      // Rule: if the recipe has exactly 1 ingredient AND that ingredient name fuzzy-matches
+      // the item name at ≥0.7, AND it appears in Modifier Detail → skip (edge case 1)
+      const isDirectSpirit = recipe.ingredients.length === 1 &&
+        similarity(recipe.ingredients[0].name, itemName) >= 0.7 &&
+        modifierData && Object.keys(modifierData).some(k => similarity(k, itemName) >= 0.5);
 
-    if (recipe && recipe.ingredients && recipe.ingredients.length) {
-      // Route through recipe ingredients
+      if (isDirectSpirit) return; // handled by modifier data instead
+
       recipe.ingredients.forEach(ing => {
         if (!ing.name) return;
         const unit = (ing.unit || 'oz').toLowerCase();
         let oz = parseFloat(ing.amount) || 0;
         if (unit === 'ml') oz = oz / 29.5735;
-        else if (unit === 'bottle') oz = oz * 25.36; // assume 750ml
-        else if (unit !== 'oz') return; // skip non-liquid (garnish etc)
+        else if (unit === 'bottle') oz = oz * 25.36;
+        else if (unit !== 'oz') return; // skip non-liquid
         if (oz <= 0) return;
-        addOz(ing.name, oz * qty, { via: itemName, qty, ozEach: oz, type: 'recipe' });
+        addCocktailOz(ing.name, oz * qty, { cocktailName: itemName, qty, ozEach: oz, hasRecipe: true });
       });
-    } else {
-      // No recipe — treat as a direct pour of the item itself at default pour
-      // If name looks like a specific spirit (not a cocktail), add directly
-      addOz(itemName, DEFAULT_POUR_OZ * qty, { via: itemName, qty, ozEach: DEFAULT_POUR_OZ, type: 'direct' });
+    });
+  }
+
+  // Step 2: For each depletion entry, assemble consumption
+  const result = {};
+  depletions.forEach(dep => {
+    const sizeKey     = dep.sizeKey || '750';
+    const ozPerBottle = OZ_PER_BOTTLE[sizeKey] || 25.36;
+    const k           = dep.product.toLowerCase().trim();
+
+    // Direct oz — from Modifier Detail
+    let ozFromDirect   = 0;
+    let hasModData     = false;
+    let estimatedDirect = false;
+    let directBreakdown = [];
+
+    // Find modifier data entry for this spirit
+    let modKey = null, modScore = 0;
+    if (modifierData) {
+      Object.keys(modifierData).forEach(mk => {
+        const s = similarity(dep.product, modifierData[mk].name);
+        if (s > modScore && s >= 0.4) { modScore = s; modKey = mk; }
+      });
     }
+
+    if (modKey) {
+      ozFromDirect    = modifierData[modKey].totalOz;
+      hasModData      = true;
+      directBreakdown = modifierData[modKey].breakdown || [];
+    } else if (itemsData) {
+      // Fall back: look up in Items.csv and use default pour size
+      const match = resolveItemsEntry(dep.product, itemsData);
+      if (match && match.entry.salesCat === 'Liquor') {
+        const qty = match.entry.qtySold || 0;
+        // Check if cocktail recipes account for this item already
+        const inCocktailOz = cocktailOz[k];
+        if (!inCocktailOz && qty > 0) {
+          ozFromDirect    = qty * DEFAULT_POUR_OZ;
+          estimatedDirect = true; // flagged — no modifier data
+        }
+      }
+    }
+
+    // Cocktail oz — from recipe engine
+    let ozFromCocktails = 0;
+    const cocktailSources = [];
+    // Match dep.product to cocktail ingredients
+    Object.entries(cocktailOz).forEach(([ik, cv]) => {
+      if (similarity(dep.product, cv.name) >= 0.45) {
+        ozFromCocktails += cv.totalOz;
+        cocktailSources.push(...cv.sources);
+      }
+    });
+
+    const totalOz       = ozFromDirect + ozFromCocktails;
+    const expectedBtl   = totalOz / ozPerBottle;
+    const actualUsed    = dep.startCount - dep.endCount;
+    const variance      = actualUsed - expectedBtl;
+    const varPct        = expectedBtl > 0 ? (variance / expectedBtl) * 100 : null;
+
+    const status = totalOz === 0 ? 'nodata'
+      : Math.abs(variance) > 0.75 || (varPct !== null && Math.abs(varPct) > 20) ? 'high'
+      : Math.abs(variance) > 0.35 ? 'watch'
+      : 'ok';
+
+    result[k] = {
+      product: dep.product, sizeKey, ozPerBottle,
+      actualUsed, expectedBtl, totalOz,
+      ozFromDirect, ozFromCocktails,
+      hasModData, estimatedDirect,
+      directBreakdown, cocktailSources,
+      variance, varPct, status,
+      costPerBottle: dep.costPerBottle || 0,
+      dollarVar: variance !== null && dep.costPerBottle ? variance * dep.costPerBottle : null,
+    };
   });
 
-  return consumption;
+  return result;
 }
 
-// ══════════════════════════════════════════════
-// SPIRIT VARIANCE REPORT
-// ══════════════════════════════════════════════
-
+// ── Spirit Variance Report ──
 function openSpiritVarianceReport() {
   if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
-
-  const st = S();
+  const st        = S();
   const barLabel  = activeBar === 'dh' ? 'Desert Hawk' : 'The Low Horse';
   const now       = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   const latest    = st.weeks[st.weeks.length - 1];
@@ -5882,164 +6133,124 @@ function openSpiritVarianceReport() {
     ? (latest.startDate && latest.endDate ? `${latest.startDate} → ${latest.endDate}` : getWeekLabel(latest.week))
     : 'No period on file';
 
-  // Get most recent Product Mix upload
-  const modData    = st.modifierData || {};
-  const modKeys    = Object.keys(modData).sort();
-  const latestMod  = modKeys.length ? modData[modKeys[modKeys.length - 1]] : null;
-  const salesData  = latestMod ? latestMod.data : null;
-  const menuItems  = st.menuItems || [];
+  const d           = st.productMixData || {};
+  const itemsData   = d.items    || null;
+  const modifierData = d.modifiers || null;
+  const menuItems   = st.menuItems || [];
+  const allDeps     = st.depletions || [];
+  const periodDeps  = latest ? allDeps.filter(dep => dep.week === latest.week) : allDeps;
 
-  // Get depletion data
-  const allDeps = st.depletions || [];
-  const periodDeps = latest
-    ? allDeps.filter(d => d.week === latest.week)
-    : allDeps;
+  // Filter to spirit depletion entries
+  const spiritDeps = periodDeps.filter(dep => {
+    const cl = (dep.cat||'').toLowerCase();
+    return cl.includes('spirit') || cl.includes('whiskey') || cl.includes('vodka') ||
+           cl.includes('gin') || cl.includes('rum') || cl.includes('tequila') ||
+           cl.includes('bourbon') || cl.includes('liqueur') || cl.includes('liquor') ||
+           cl.includes('mezcal') || cl.includes('brandy') || cl.includes('cognac');
+  });
 
-  // Build consumption map from sales + recipes
-  const consumption = salesData ? buildSpiritConsumption(salesData, menuItems) : {};
+  const consumptionMap = buildConsumptionMap(spiritDeps, itemsData, modifierData, menuItems);
 
-  // ── Bottled beer variance (simple: qty sold vs count) ──
+  // ── Packaged beer rows ──
   const beerRows = [];
-  if (salesData) {
-    Object.entries(salesData).forEach(([name, item]) => {
+  if (itemsData) {
+    Object.entries(itemsData).forEach(([name, item]) => {
       if (item.salesCat !== 'Bottled Beer') return;
-      const qty = item.qtySold || 0;
-      if (qty <= 0 && item.voidAmt <= 0) return;
-      // Find matching depletion entry
-      const dep = periodDeps.find(d => similarity(d.product, name) >= 0.6);
+      const qtySold = item.qtySold || 0;
+      if (qtySold <= 0 && item.voidAmt <= 0) return;
+      const dep = periodDeps.find(d => similarity(d.product, name) >= 0.55);
       const actualUsed = dep ? (dep.startCount - dep.endCount) : null;
-      const variance   = actualUsed !== null ? actualUsed - qty : null;
+      const variance   = actualUsed !== null ? actualUsed - qtySold : null;
       beerRows.push({
-        product: name,
-        qtySold: qty,
-        actualUsed,
-        variance,
+        product: name, qtySold, actualUsed, variance,
         costPerUnit: dep?.costPerBottle || 0,
         dollarVar: variance !== null && dep?.costPerBottle ? variance * dep.costPerBottle : null,
         status: variance === null ? 'nocount' : Math.abs(variance) > 5 ? 'high' : Math.abs(variance) > 2 ? 'watch' : 'ok'
       });
     });
+    beerRows.sort((a,b) => {const r={high:0,watch:1,nocount:2,ok:3}; return (r[a.status]||3)-(r[b.status]||3)||Math.abs(b.variance||0)-Math.abs(a.variance||0);});
   }
 
-  // ── Spirit variance rows ──
-  const spiritRows = [];
+  // ── Cocktails missing recipes ──
+  const missingRecipes = itemsData ? Object.entries(itemsData)
+    .filter(([n,v]) => v.salesCat === 'Liquor' && v.qtySold >= 3)
+    .filter(([n]) => {
+      const hasRecipe = menuItems.some(m => similarity(m.name, n) >= 0.7);
+      const isDirectSpirit = Object.keys(consumptionMap).some(k => similarity(k, n.toLowerCase()) >= 0.5);
+      return !hasRecipe && !isDirectSpirit;
+    })
+    .sort((a,b) => b[1].qtySold - a[1].qtySold)
+    .slice(0, 10) : [];
 
-  // For each depletion entry, find consumption from sales data
-  periodDeps.forEach(dep => {
-    const catL = (dep.cat || '').toLowerCase();
-    const isSpirit = catL.includes('spirit') || catL.includes('whiskey') || catL.includes('vodka') ||
-                     catL.includes('gin') || catL.includes('rum') || catL.includes('tequila') ||
-                     catL.includes('bourbon') || catL.includes('liqueur') || catL.includes('liquor') ||
-                     catL.includes('mezcal') || catL.includes('brandy') || catL.includes('cognac');
-    if (!isSpirit) return;
+  // ── Spirits in sales not counted ──
+  const uncountedSpirits = itemsData ? Object.entries(itemsData)
+    .filter(([n,v]) => v.salesCat === 'Liquor' && v.qtySold > 0)
+    .filter(([n]) => !Object.keys(consumptionMap).some(k => similarity(k, n.toLowerCase()) >= 0.45))
+    .filter(([n]) => !menuItems.some(m => similarity(m.name, n) >= 0.7)) // cocktails handled separately
+    .sort((a,b) => b[1].qtySold - a[1].qtySold)
+    .slice(0, 10) : [];
 
-    const actualUsed = dep.startCount - dep.endCount;
-    const sizeKey    = dep.sizeKey || '750';
-    const ozPerBottle = OZ_PER_BOTTLE[sizeKey] || 25.36;
+  // Sort spirit rows
+  const spiritRows = Object.values(consumptionMap);
+  const rankOrder  = { high:0, watch:1, nodata:2, ok:3 };
+  spiritRows.sort((a,b) => (rankOrder[a.status]||3)-(rankOrder[b.status]||3) || Math.abs(b.variance||0)-Math.abs(a.variance||0));
 
-    // Find best consumption match
-    let bestKey = null, bestScore = 0;
-    Object.keys(consumption).forEach(k => {
-      const s = similarity(dep.product, consumption[k].name);
-      if (s > bestScore && s >= 0.4) { bestScore = s; bestKey = k; }
-    });
-
-    const cons         = bestKey ? consumption[bestKey] : null;
-    const expectedOz   = cons ? cons.ozConsumed : null;
-    const expectedBtl  = expectedOz !== null ? expectedOz / ozPerBottle : null;
-    const variance     = expectedBtl !== null ? actualUsed - expectedBtl : null;
-    const varPct       = expectedBtl > 0 ? (variance / expectedBtl) * 100 : null;
-
-    const status = variance === null ? 'nodata'
-      : Math.abs(variance) > 0.75 || (varPct !== null && Math.abs(varPct) > 20) ? 'high'
-      : Math.abs(variance) > 0.35 ? 'watch'
-      : 'ok';
-
-    spiritRows.push({
-      product: dep.product, sizeKey, actualUsed,
-      expectedBtl, variance, varPct,
-      costPerBottle: dep.costPerBottle || 0,
-      dollarVar: variance !== null && dep.costPerBottle ? variance * dep.costPerBottle : null,
-      status,
-      sources: cons?.sources || [],
-      matchedName: cons?.name || null,
-      hasRecipe: cons?.sources.some(s => s.type === 'recipe') || false,
-      noSalesData: !salesData
-    });
-  });
-
-  // Spirits in sales data with NO depletion entry
-  const nocountSpirits = [];
-  Object.values(consumption).forEach(c => {
-    const matched = spiritRows.some(r => similarity(r.product, c.name) >= 0.4);
-    if (!matched) nocountSpirits.push(c);
-  });
-
-  // Sort: high → watch → nodata/nocount → ok
-  const rank = { high:0, watch:1, nodata:2, nocount:2, ok:3 };
-  spiritRows.sort((a,b) => (rank[a.status]||3) - (rank[b.status]||3) || Math.abs(b.variance||0) - Math.abs(a.variance||0));
-  beerRows.sort((a,b)   => (rank[a.status]||3) - (rank[b.status]||3) || Math.abs(b.variance||0) - Math.abs(a.variance||0));
-
-  // Summary
+  // Summary stats
   const flaggedSpirits  = spiritRows.filter(r => r.status === 'high').length;
   const flaggedBeer     = beerRows.filter(r => r.status === 'high').length;
-  const totalDollarRisk = [...spiritRows, ...beerRows].reduce((s,r) => s + Math.max(0, r.dollarVar||0), 0);
-  const uncoveredCocktails = menuItems.filter(m => {
-    if (!salesData) return false;
-    const sold = Object.entries(salesData).find(([n]) => similarity(n, m.name) >= 0.7);
-    return sold && sold[1].qtySold > 0;
-  });
+  const dollarRisk      = [...spiritRows,...beerRows].reduce((s,r) => s + Math.max(0, r.dollarVar||0), 0);
+  const recipeCoverage  = menuItems.length ? menuItems.filter(m =>
+    itemsData && Object.entries(itemsData).some(([n,v]) => v.salesCat==='Liquor' && similarity(n,m.name)>=0.7)
+  ).length : 0;
+  const sizeLabel = k => ({ '1750':'1.75L','1000':'1L','750':'750ml','375':'375ml' }[k]||k);
 
-  const sizeLabel = k => ({ '1750':'1.75L','1000':'1L','750':'750ml','375':'375ml' }[k] || k);
-
+  // ── Render spirit row ──
   const renderSpiritRow = r => {
-    const nodata = r.noSalesData || r.status === 'nodata';
     const badge = r.status === 'high'   ? `<span class="svr-recount">RECOUNT</span>`
       : r.status === 'watch'  ? `<span class="svr-recount" style="background:#fef3e2;color:#c0841a;">WATCH</span>`
-      : r.status === 'nodata' ? `<span style="background:#f0f0f0;color:#999;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO SALES DATA</span>`
+      : r.status === 'nodata' ? `<span style="background:#f0f0f0;color:#888;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO SALES DATA</span>`
       : `<span class="svr-ok-badge">OK</span>`;
 
-    const varDisp = r.variance !== null
+    const varDisp = r.totalOz > 0
       ? `<span class="${Math.abs(r.variance)>0.35?(r.variance>0?'svr-var-neg':'svr-var-pos'):'svr-var-ok'}">${r.variance>0?'+':''}${r.variance.toFixed(2)}</span>${r.varPct!==null?`<div style="font-size:9px;color:#999;">${r.varPct>0?'+':''}${r.varPct.toFixed(0)}%</div>`:''}`
       : '<span style="color:#ccc">—</span>';
 
-    // Source breakdown tooltip text
-    const sourcesByItem = {};
-    r.sources.forEach(s => {
-      if (!sourcesByItem[s.via]) sourcesByItem[s.via] = 0;
-      sourcesByItem[s.via] += s.ozEach * s.qty;
-    });
-    const sourceHint = Object.entries(sourcesByItem)
-      .sort((a,b) => b[1]-a[1])
-      .slice(0,3)
-      .map(([via, oz]) => `${via}: ${oz.toFixed(1)}oz`)
-      .join(' · ');
+    // Build a concise source line
+    const directLabel  = r.ozFromDirect > 0
+      ? `${r.ozFromDirect.toFixed(1)}oz direct${r.estimatedDirect?' <span style="color:#c0841a;">(est.)</span>':''}`
+      : '';
+    // Summarise cocktail sources
+    const byDrink = {};
+    r.cocktailSources.forEach(s => { byDrink[s.cocktailName] = (byDrink[s.cocktailName]||0) + s.ozEach * s.qty; });
+    const cocktailLabel = Object.entries(byDrink).sort((a,b)=>b[1]-a[1]).slice(0,3)
+      .map(([n,oz]) => `${n} ${oz.toFixed(1)}oz`).join(' · ');
 
     return `<tr class="${r.status==='high'?'problem':r.status==='ok'?'ok':''}">
       <td>
         <div style="font-weight:700;font-size:12px;">${escHtml(r.product)}</div>
-        <div style="font-size:9px;color:#999;margin-top:2px;">
-          ${sizeLabel(r.sizeKey)}
-          ${r.hasRecipe ? ' · <span style="color:#27ae60;">recipe ✓</span>' : r.sources.length ? ' · direct pour assumed' : ''}
-          ${sourceHint ? `<br>${sourceHint}` : ''}
+        <div style="font-size:9px;color:#999;margin-top:2px;line-height:1.6;">
+          ${sizeLabel(r.sizeKey)} · ${r.ozPerBottle}oz/btl
+          ${r.hasModData ? '<span style="color:#27ae60;"> · exact oz ✓</span>' : r.estimatedDirect ? '<span style="color:#c0841a;"> · pour est.</span>' : ''}
+          ${directLabel ? `<br>Direct: ${directLabel}` : ''}
+          ${cocktailLabel ? `<br>Cocktails: <span style="color:#2980b9;">${cocktailLabel}</span>` : ''}
         </div>
       </td>
-      <td class="num">${r.actualUsed !== null ? r.actualUsed.toFixed(2) : '—'}</td>
-      <td class="num">${r.expectedBtl !== null ? r.expectedBtl.toFixed(2) : '—'}</td>
+      <td class="num">${r.actualUsed.toFixed(2)}</td>
+      <td class="num">${r.expectedBtl > 0 ? r.expectedBtl.toFixed(2) : '—'}</td>
       <td class="num">${varDisp}</td>
-      <td class="num">${r.dollarVar !== null && r.dollarVar > 0 ? `<span style="color:#c0392b;">$${r.dollarVar.toFixed(2)}</span>` : '—'}</td>
+      <td class="num">${r.dollarVar !== null && Math.abs(r.dollarVar) > 0.01 ? `<span style="color:${r.dollarVar>0?'#c0392b':'#27ae60'};">${r.dollarVar>0?'+':'-'}$${Math.abs(r.dollarVar).toFixed(2)}</span>` : '—'}</td>
       <td>${badge}</td>
     </tr>
-    ${r.status==='high'||r.status==='watch'?`<tr class="${r.status==='high'?'problem':''}"><td colspan="6" style="padding:0 8px 8px;">
+    ${(r.status==='high'||r.status==='watch')?`<tr class="${r.status==='high'?'problem':''}"><td colspan="6" style="padding:0 8px 8px;">
       <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Notes / recount result:</div>
       <div class="svr-notes"></div>
     </td></tr>`:''}`;
   };
 
   const renderBeerRow = r => {
-    const badge = r.status === 'high'    ? `<span class="svr-recount">RECOUNT</span>`
-      : r.status === 'watch'   ? `<span class="svr-recount" style="background:#fef3e2;color:#c0841a;">WATCH</span>`
-      : r.status === 'nocount' ? `<span style="background:#e8f4fc;color:#2980b9;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO COUNT</span>`
+    const badge = r.status==='high' ? `<span class="svr-recount">RECOUNT</span>`
+      : r.status==='watch'   ? `<span class="svr-recount" style="background:#fef3e2;color:#c0841a;">WATCH</span>`
+      : r.status==='nocount' ? `<span style="background:#e8f4fc;color:#2980b9;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO COUNT</span>`
       : `<span class="svr-ok-badge">OK</span>`;
     const varDisp = r.variance !== null
       ? `<span class="${Math.abs(r.variance)>2?(r.variance>0?'svr-var-neg':'svr-var-pos'):'svr-var-ok'}">${r.variance>0?'+':''}${r.variance.toFixed(0)}</span>`
@@ -6049,51 +6260,46 @@ function openSpiritVarianceReport() {
       <td class="num">${r.actualUsed !== null ? r.actualUsed.toFixed(0) : '—'}</td>
       <td class="num">${r.qtySold.toFixed(0)}</td>
       <td class="num">${varDisp}</td>
-      <td class="num">${r.dollarVar !== null && r.dollarVar > 0 ? `<span style="color:#c0392b;">$${r.dollarVar.toFixed(2)}</span>` : '—'}</td>
+      <td class="num">${r.dollarVar !== null && Math.abs(r.dollarVar)>0.01 ? `<span style="color:${r.dollarVar>0?'#c0392b':'#27ae60'};">$${Math.abs(r.dollarVar).toFixed(2)}</span>` : '—'}</td>
       <td>${badge}</td>
     </tr>`;
   };
-
-  // Cocktail coverage summary
-  const cocktailsWithRecipe = menuItems.filter(m => {
-    if (!salesData) return false;
-    const soldEntry = Object.entries(salesData).find(([n]) => similarity(n, m.name) >= 0.7);
-    return soldEntry && soldEntry[1].salesCat === 'Liquor';
-  });
-  const cocktailsWithoutRecipe = salesData ? Object.entries(salesData)
-    .filter(([n, v]) => v.salesCat === 'Liquor' && v.qtySold > 5)
-    .filter(([n]) => !menuItems.some(m => similarity(m.name, n) >= 0.7))
-    .sort((a,b) => b[1].qtySold - a[1].qtySold)
-    .slice(0, 8) : [];
 
   const html = `
     <div class="svr-logo">POUR<span>COST</span></div>
     <div class="svr-subtitle">
       ${barLabel.toUpperCase()} &nbsp;·&nbsp; SPIRIT VARIANCE REPORT &nbsp;·&nbsp; ${periodLabel} &nbsp;·&nbsp; ${now}
-      ${latestMod ? `<br>Sales data: ${latestMod.filename}` : '<br><span style="color:#c0392b;">⚠ No Product Mix uploaded — expected usage unavailable</span>'}
+      ${d.itemsFile ? `<br>Items: ${d.itemsFile}${d.itemsRange?' ('+d.itemsRange.raw+')':''}` : '<br><span style="color:#c0392b;">⚠ No Product Mix uploaded</span>'}
+      ${d.modifiersFile ? ` &nbsp;·&nbsp; Modifiers: ${d.modifiersFile}${d.modifiersRange?' ('+d.modifiersRange.raw+')':''}` : ' &nbsp;·&nbsp; <span style="color:#c0841a;">⚠ No Modifier Detail — direct pours estimated</span>'}
     </div>
 
     <div class="svr-summary-row">
       <div class="svr-stat"><div class="svr-stat-label">Spirits Tracked</div><div class="svr-stat-val">${spiritRows.length}</div></div>
-      <div class="svr-stat"><div class="svr-stat-label">Need Recount</div><div class="svr-stat-val" style="color:#c0392b;">${flaggedSpirits + flaggedBeer}</div></div>
-      <div class="svr-stat"><div class="svr-stat-label">Recipe Coverage</div><div class="svr-stat-val" style="color:${cocktailsWithRecipe.length>0?'#27ae60':'#c0841a'};">${cocktailsWithRecipe.length}/${menuItems.length}</div></div>
-      <div class="svr-stat"><div class="svr-stat-label">$ At Risk</div><div class="svr-stat-val" style="color:#c0392b;">${totalDollarRisk > 0 ? '$'+totalDollarRisk.toFixed(2) : '—'}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">Need Recount</div><div class="svr-stat-val" style="color:${flaggedSpirits+flaggedBeer>0?'#c0392b':'#27ae60'};">${flaggedSpirits + flaggedBeer}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">Recipe Coverage</div><div class="svr-stat-val" style="color:${missingRecipes.length>0?'#c0841a':'#27ae60'};">${menuItems.length - missingRecipes.length}/${menuItems.length}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">$ At Risk</div><div class="svr-stat-val" style="color:${dollarRisk>0?'#c0392b':'#27ae60'};">${dollarRisk > 0 ? '$'+dollarRisk.toFixed(2) : '$0'}</div></div>
     </div>
 
-    ${cocktailsWithoutRecipe.length ? `
-    <div style="background:#fffbe6;border:1px solid #f0c040;border-radius:3px;padding:10px 14px;margin-bottom:16px;font-size:11px;">
-      <strong>⚠ High-volume items without a recipe in Menu Costing</strong> — consumption estimated at ${DEFAULT_POUR_OZ}oz/sale. Add recipes for accuracy:<br><br>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
-        ${cocktailsWithoutRecipe.map(([n,v]) => `<span style="background:#fff;border:1px solid #f0c040;padding:3px 10px;border-radius:3px;font-weight:700;">${escHtml(n)} <span style="color:#888;font-weight:400;">(${v.qtySold} sold)</span></span>`).join('')}
+    ${dateRangesMatch(d.itemsRange, d.modifiersRange) === false ? `
+    <div style="background:#fdecea;border:1px solid #e74c3c;border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:#c0392b;">
+      ⚠ <strong>Date range mismatch</strong> — Items report covers ${d.itemsRange?.raw||'?'} but Modifier Detail covers ${d.modifiersRange?.raw||'?'}. Results will be inaccurate. Re-upload matching reports.
+    </div>` : ''}
+
+    ${missingRecipes.length ? `
+    <div style="background:#fffbe6;border:1px solid #f0c040;border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:11px;">
+      <strong>⚠ High-volume cocktails without a recipe</strong> — consumption attributed at ${DEFAULT_POUR_OZ}oz/sale estimate. Add these to <strong>Menu Costing</strong> for accuracy:
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">
+        ${missingRecipes.map(([n,v]) => `<span style="background:#fff;border:1px solid #f0c040;padding:2px 8px;border-radius:3px;font-weight:700;">${escHtml(n)} <span style="color:#888;font-weight:400;">(${v.qtySold} sold)</span></span>`).join('')}
       </div>
     </div>` : ''}
 
-    <div style="font-size:10px;color:#666;margin-bottom:14px;line-height:1.8;background:#f9f9f9;border:1px solid #eee;padding:10px 14px;border-radius:3px;">
+    <div style="font-size:10px;color:#555;margin-bottom:14px;line-height:1.8;background:#f9f9f9;border:1px solid #eee;padding:10px 14px;border-radius:3px;">
       <strong>How to read this:</strong> &nbsp;
-      <strong>Actual Used</strong> = opening count − closing count (bottles). &nbsp;
-      <strong>Expected Used</strong> = oz sold from Toast ÷ bottle oz (via recipes where available, otherwise ${DEFAULT_POUR_OZ}oz assumed). &nbsp;
-      <strong>Variance (+)</strong> = used more than sold — missing product. &nbsp;
-      <span style="color:#27ae60;">Recipe ✓</span> = consumption routed through your Menu Costing recipe.
+      <strong>Actual Used</strong> = opening − closing count (bottles). &nbsp;
+      <strong>Expected Used</strong> = (oz from Modifier Detail OR estimate) + (cocktail oz via recipes) ÷ bottle size. &nbsp;
+      <strong>+Variance</strong> = used more than sold (missing product). &nbsp;
+      <span style="color:#27ae60;">Exact oz ✓</span> = Modifier Detail confirmed pour sizes for this spirit. &nbsp;
+      <span style="color:#c0841a;">Pour est.</span> = no modifier data, ${DEFAULT_POUR_OZ}oz assumed.
     </div>
 
     ${spiritRows.length ? `
@@ -6111,46 +6317,36 @@ function openSpiritVarianceReport() {
     </table>` : `<div style="color:#999;font-size:12px;padding:16px 0;">No spirit depletion entries for this period. Add bottle counts in the Bottle Depletion tab.</div>`}
 
     ${beerRows.length ? `
-    <div class="svr-section-title">🍺 Packaged Beer & RTD</div>
+    <div class="svr-section-title">🍺 Packaged Beer &amp; RTD</div>
     <table class="svr-table">
       <thead><tr>
-        <th>Product</th>
-        <th class="num">Actual<br>Used (cans)</th>
-        <th class="num">POS<br>Sold</th>
-        <th class="num">Variance</th>
-        <th class="num">$ Risk</th>
-        <th>Status</th>
+        <th>Product</th><th class="num">Counted Used</th><th class="num">POS Sold</th>
+        <th class="num">Variance</th><th class="num">$ Risk</th><th>Status</th>
       </tr></thead>
       <tbody>${beerRows.map(renderBeerRow).join('')}</tbody>
     </table>` : ''}
 
-    ${nocountSpirits.length ? `
+    ${uncountedSpirits.length ? `
     <div class="svr-section-title">⚠ Spirits Sold But Not Counted</div>
-    <div style="font-size:11px;color:#666;margin-bottom:8px;">These appeared in your sales data but have no matching depletion entry. Add them to Bottle Depletion for full tracking.</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
-      ${nocountSpirits.sort((a,b)=>b.ozConsumed-a.ozConsumed).slice(0,12).map(c =>
-        `<span style="background:#e8f4fc;color:#2980b9;border-radius:3px;padding:4px 10px;font-size:11px;font-weight:700;">${escHtml(c.name)} <span style="font-weight:400;">(${c.ozConsumed.toFixed(1)}oz sold)</span></span>`
-      ).join('')}
+    <div style="font-size:11px;color:#666;margin-bottom:8px;">These appeared in your sales data with no matching depletion entry. Add them to Bottle Depletion for full tracking.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;">
+      ${uncountedSpirits.map(([n,v]) => `<span style="background:#e8f4fc;color:#2980b9;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">${escHtml(n)} <span style="font-weight:400;">(${v.qtySold} sold)</span></span>`).join('')}
     </div>` : ''}
 
     <div class="svr-footer">
       <span>PourCost Spirit Variance — ${barLabel}</span>
       <span>Generated ${now}</span>
-    </div>
-  `;
+    </div>`;
 
   document.getElementById('variance-report-page').innerHTML = html;
   document.getElementById('variance-report-overlay').style.display = 'block';
 }
 
-const DEFAULT_POUR_OZ = 1.5;
-
 function closeSpiritVarianceReport() {
   document.getElementById('variance-report-overlay').style.display = 'none';
 }
 
-// ══════════════════════════════════════════════
-// CATEGORY BREAKDOWN
+
 // ══════════════════════════════════════════════
 const CAT_DEFS = [
   { key:'spirits', label:'Spirits',   match:['spirits'],               color:'#e67e22' },
