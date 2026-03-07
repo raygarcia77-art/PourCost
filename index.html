@@ -254,6 +254,115 @@ input::placeholder{color:var(--muted);}
 .cat-bar-fill.mixers{background:#16a085;}
 .cat-bar-fill.other{background:var(--muted);}
 
+/* ── CATEGORY DRILL-DOWN MODAL ── */
+.drill-modal{width:780px;max-height:88vh;overflow-y:auto;}
+.drill-header-bar{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.drill-cat-badge{display:inline-block;padding:4px 14px;border-radius:3px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;}
+.drill-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.drill-stat{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px 14px;}
+.drill-stat-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.drill-stat-val{font-family:var(--display);font-size:20px;}
+.drill-item-row{display:grid;grid-template-columns:1fr 60px 70px 80px 90px 80px;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;}
+.drill-item-row:last-child{border-bottom:none;}
+.drill-item-row.drill-header{background:var(--surface2);border-radius:4px 4px 0 0;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);}
+.drill-item-name{font-family:var(--display);font-size:13px;letter-spacing:0.5px;}
+.price-up-flag{display:inline-block;background:rgba(192,57,43,0.12);color:var(--accent2);border-radius:3px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px;vertical-align:middle;}
+.price-down-flag{display:inline-block;background:rgba(39,174,96,0.12);color:var(--green);border-radius:3px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px;vertical-align:middle;}
+.drill-sort-btn{cursor:pointer;user-select:none;}
+.drill-sort-btn:hover{color:var(--accent);}
+.drill-sort-btn.active{color:var(--accent);}
+/* ── SPIRIT VARIANCE REPORT ── */
+#variance-report-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9200;overflow-y:auto;padding:30px;}
+.variance-report-page{background:#fff;color:#1a1a1a;max-width:800px;margin:0 auto;padding:36px 44px;border-radius:4px;font-family:'Arial',sans-serif;}
+.svr-logo{font-size:20px;font-weight:700;letter-spacing:3px;margin-bottom:2px;}
+.svr-logo span{color:#c0841a;}
+.svr-subtitle{font-size:10px;color:#888;letter-spacing:1px;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #1a1a1a;}
+.svr-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:24px;}
+.svr-table th{border-bottom:2px solid #1a1a1a;padding:7px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#444;}
+.svr-table th.num{text-align:right;}
+.svr-table td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}
+.svr-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.svr-table tr.problem td{background:#fef9f9;}
+.svr-table tr.ok td{background:#f9fef9;}
+.svr-var-neg{color:#c0392b;font-weight:700;}
+.svr-var-pos{color:#27ae60;font-weight:700;}
+.svr-var-ok{color:#888;}
+.svr-recount{display:inline-block;background:#fdecea;color:#c0392b;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:0.5px;}
+.svr-ok-badge{display:inline-block;background:#eafaf1;color:#27ae60;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:0.5px;}
+.svr-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#333;margin:20px 0 8px;}
+.svr-notes{border:1px dashed #ccc;border-radius:2px;min-height:28px;margin-top:4px;padding:4px 6px;font-size:10px;color:#aaa;}
+.svr-footer{margin-top:24px;padding-top:10px;border-top:1px solid #ddd;font-size:9px;color:#aaa;display:flex;justify-content:space-between;}
+.svr-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.svr-stat{border:1px solid #e0e0e0;padding:10px 14px;border-radius:3px;}
+.svr-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px;}
+.svr-stat-val{font-size:22px;font-weight:700;}
+@media print{
+  #variance-report-overlay{display:block!important;position:static!important;background:#fff!important;padding:0!important;}
+  #variance-report-btns{display:none!important;}
+  .variance-report-page{box-shadow:none!important;margin:0!important;border-radius:0!important;}
+}
+/* ── ACTION ITEMS REPORT ── */
+#action-report-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9100;overflow-y:auto;padding:30px;}
+.action-report-page{background:#fff;color:#1a1a1a;max-width:760px;margin:0 auto;padding:36px 44px;border-radius:4px;font-family:'Arial',sans-serif;}
+.ar-logo{font-size:20px;font-weight:700;letter-spacing:3px;margin-bottom:2px;}
+.ar-logo span{color:#c0841a;}
+.ar-subtitle{font-size:10px;color:#888;letter-spacing:1px;margin-bottom:6px;}
+.ar-period{font-size:11px;color:#444;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #1a1a1a;}
+.ar-section{margin-bottom:24px;}
+.ar-section-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #ddd;}
+.ar-section-icon{font-size:16px;}
+.ar-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#333;}
+.ar-section-count{font-size:10px;color:#888;margin-left:auto;}
+.ar-item{display:grid;gap:6px;padding:10px 12px;border:1px solid #e0e0e0;border-radius:3px;margin-bottom:6px;border-left:3px solid #ccc;}
+.ar-item.priority-high{border-left-color:#c0392b;}
+.ar-item.priority-warn{border-left-color:#c0841a;}
+.ar-item.priority-info{border-left-color:#2980b9;}
+.ar-item-top{display:flex;align-items:flex-start;gap:10px;}
+.ar-checkbox{width:14px;height:14px;border:1.5px solid #999;border-radius:2px;flex-shrink:0;margin-top:2px;}
+.ar-item-name{font-size:13px;font-weight:700;flex:1;}
+.ar-item-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:2px 7px;border-radius:2px;flex-shrink:0;}
+.ar-item-tag.high{background:#fdecea;color:#c0392b;}
+.ar-item-tag.warn{background:#fef3e2;color:#c0841a;}
+.ar-item-tag.info{background:#e8f4fc;color:#2980b9;}
+.ar-item-detail{font-size:11px;color:#555;line-height:1.6;padding-left:24px;}
+.ar-item-action{font-size:10px;color:#888;font-style:italic;padding-left:24px;}
+.ar-notes-box{border:1px dashed #ccc;border-radius:3px;padding:8px 12px;min-height:36px;margin-top:6px;}
+.ar-notes-label{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.ar-empty{text-align:center;padding:30px;font-size:12px;color:#27ae60;font-weight:700;letter-spacing:1px;}
+.ar-footer{margin-top:28px;padding-top:10px;border-top:1px solid #ddd;font-size:9px;color:#aaa;display:flex;justify-content:space-between;}
+@media print{
+  #action-report-overlay{display:block!important;position:static!important;background:#fff!important;padding:0!important;}
+  #action-report-btns{display:none!important;}
+  .action-report-page{box-shadow:none!important;margin:0!important;border-radius:0!important;}
+}
+/* ── PRINT REPORT ── */
+.print-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:3px;font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.15s;letter-spacing:0.5px;}
+.print-btn:hover{border-color:var(--text);color:var(--text);}
+@media print{
+  body{background:#fff!important;color:#000!important;}
+  .tabs,.sync-bar,header,.btn,button,.upload-box,.modal-overlay{display:none!important;}
+  #print-report-overlay{display:block!important;position:static!important;background:#fff!important;}
+  .print-report-page{box-shadow:none!important;margin:0!important;padding:20px!important;}
+}
+#print-report-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;overflow-y:auto;padding:30px;}
+.print-report-page{background:#fff;color:#1a1a1a;max-width:820px;margin:0 auto;padding:36px 44px;border-radius:4px;font-family:'Georgia',serif;}
+.pr-logo{font-size:24px;font-weight:700;letter-spacing:3px;margin-bottom:2px;font-family:'Arial',sans-serif;}
+.pr-logo span{color:#c0841a;}
+.pr-subtitle{font-size:11px;color:#666;letter-spacing:1px;font-family:'Arial',sans-serif;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1a1a1a;}
+.pr-section-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#666;font-family:'Arial',sans-serif;margin:22px 0 10px;}
+.pr-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px;}
+.pr-kpi{border:1px solid #ddd;padding:12px 14px;border-radius:3px;}
+.pr-kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:'Arial',sans-serif;margin-bottom:4px;}
+.pr-kpi-val{font-size:26px;font-family:'Arial',sans-serif;font-weight:700;}
+.pr-kpi-sub{font-size:10px;color:#888;font-family:'Arial',sans-serif;}
+.pr-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'Arial',sans-serif;margin-bottom:8px;}
+.pr-table th{border-bottom:2px solid #1a1a1a;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#444;}
+.pr-table td{padding:6px 8px;border-bottom:1px solid #eee;}
+.pr-table tr:last-child td{border-bottom:none;}
+.pr-table .num{text-align:right;}
+.pr-flag-up{color:#c0392b;font-weight:700;}
+.pr-flag-dn{color:#27ae60;font-weight:700;}
+.pr-footer{margin-top:32px;padding-top:12px;border-top:1px solid #ddd;font-size:9px;color:#aaa;font-family:'Arial',sans-serif;display:flex;justify-content:space-between;}
 /* ── SHRINKAGE / THEORETICAL vs ACTUAL ── */
 .shrink-alert{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.25);border-radius:6px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
 .shrink-alert-icon{font-size:22px;flex-shrink:0;}
@@ -554,13 +663,20 @@ input::placeholder{color:var(--muted);}
       </div>
 
       <!-- Category Breakdown -->
-      <div class="section-header" style="margin-top:8px;"><div class="section-title">COGS BY CATEGORY</div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);">Based on purchases vs category sales</div></div>
+      <div class="section-header" style="margin-top:8px;">
+        <div class="section-title">COGS BY CATEGORY <span style="font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:normal;letter-spacing:0;text-transform:none;">— click any card to drill down</span></div>
+        <div style="display:flex;gap:8px;">
+          <button class="print-btn" onclick="openActionReport()">⚑ Action Items</button>
+          <button class="print-btn" onclick="openSpiritVarianceReport()">🥃 Spirit Variance</button>
+          <button class="print-btn" onclick="openPrintReport()">⎙ Print Report</button>
+        </div>
+      </div>
       <div id="cat-breakdown-note" style="display:none;font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:8px;">✓ Using actual category sales from POS upload — COGS % is per-category accurate</div>
       <div class="cat-grid" id="cat-breakdown-grid">
-        <div class="cat-card spirits"><div class="cat-name">Spirits</div><div class="cat-pct" id="cat-spirits">—</div><div class="cat-detail" id="cat-spirits-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill spirits" id="cat-spirits-bar" style="width:0%"></div></div></div>
-        <div class="cat-card beer"><div class="cat-name">Beer</div><div class="cat-pct" id="cat-beer">—</div><div class="cat-detail" id="cat-beer-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill beer" id="cat-beer-bar" style="width:0%"></div></div></div>
-        <div class="cat-card wine"><div class="cat-name">Wine</div><div class="cat-pct" id="cat-wine">—</div><div class="cat-detail" id="cat-wine-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill wine" id="cat-wine-bar" style="width:0%"></div></div></div>
-        <div class="cat-card mixers"><div class="cat-name">Mixers &amp; Other</div><div class="cat-pct" id="cat-mixers">—</div><div class="cat-detail" id="cat-mixers-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill mixers" id="cat-mixers-bar" style="width:0%"></div></div></div>
+        <div class="cat-card spirits" style="cursor:pointer;" onclick="openDrillDown('spirits')"><div class="cat-name">Spirits</div><div class="cat-pct" id="cat-spirits">—</div><div class="cat-detail" id="cat-spirits-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill spirits" id="cat-spirits-bar" style="width:0%"></div></div></div>
+        <div class="cat-card beer" style="cursor:pointer;" onclick="openDrillDown('beer')"><div class="cat-name">Beer</div><div class="cat-pct" id="cat-beer">—</div><div class="cat-detail" id="cat-beer-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill beer" id="cat-beer-bar" style="width:0%"></div></div></div>
+        <div class="cat-card wine" style="cursor:pointer;" onclick="openDrillDown('wine')"><div class="cat-name">Wine</div><div class="cat-pct" id="cat-wine">—</div><div class="cat-detail" id="cat-wine-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill wine" id="cat-wine-bar" style="width:0%"></div></div></div>
+        <div class="cat-card mixers" style="cursor:pointer;" onclick="openDrillDown('mixers')"><div class="cat-name">Mixers &amp; Other</div><div class="cat-pct" id="cat-mixers">—</div><div class="cat-detail" id="cat-mixers-detail">No purchases</div><div class="cat-bar-wrap"><div class="cat-bar-fill mixers" id="cat-mixers-bar" style="width:0%"></div></div></div>
       </div>
 
       <!-- Shrinkage Alert -->
@@ -604,6 +720,9 @@ input::placeholder{color:var(--muted);}
             </div>
           </div>
         </div>
+      <div style="margin-bottom:16px;">
+        <div class="upload-box" id="upload-modifier" style="display:grid;grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:14px;padding:16px 20px;"><input type="file" accept=".csv,.zip" onchange="handleProductMixUpload(this)"><div style="font-size:24px;">🥃</div><div><div class="upload-title">Product Mix Report</div><div class="upload-hint">Toast — Product Mix export (.zip or Items.csv)</div><div class="upload-status" id="modifier-status"></div></div></div>
+      </div>
       <hr class="divider">
       <div class="section-header"><div class="section-title">PERIOD ENTRY</div></div>
       <div id="sb-weekly-form">
@@ -1358,7 +1477,7 @@ let activeBar = 'dh'; // 'dh' | 'lh' | 'combined'
 
 // Per-bar state
 function emptyBarState() {
-  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{}, unresolvedInvItems:[] };
+  return { weeks:[], purchases:[], priceHistory:{}, productMaps:[], posItems:[], menuItems:[], wasteLogs:[], depletions:[], ignoredPosItems:[], invoiceNumbers:[], transfers:[], submissionLog:[], inventoryMappings:{}, unresolvedInvItems:[], modifierData:{} };
 }
 
 let states = { dh: emptyBarState(), lh: emptyBarState() };
@@ -4939,6 +5058,1098 @@ window.addEventListener('online',()=>{isOnline=true;setSyncStatus('pending','Bac
 window.addEventListener('offline',()=>{isOnline=false;setSyncStatus('offline','Offline — changes saved locally');});
 
 // ══════════════════════════════════════════════
+// CATEGORY DRILL-DOWN
+// ══════════════════════════════════════════════
+let _drillCatKey = null;
+let _drillSort = { field:'total', dir:'desc' };
+
+function getPeriodPurchases(barId) {
+  // Returns purchases scoped to the current/latest period's date range
+  const st = states[barId || activeBar];
+  const weeks = st.weeks;
+  if (!weeks.length) return [];
+  const latest = weeks[weeks.length - 1];
+  // Use period start/end dates if available, else fall back to 4-week window
+  let startDate, endDate;
+  if (latest.startDate && latest.endDate) {
+    startDate = new Date(latest.startDate + 'T00:00:00');
+    endDate   = new Date(latest.endDate   + 'T23:59:59');
+  } else {
+    endDate   = new Date();
+    const cutoff = weeks.length >= 4 ? weeks[weeks.length-4].week : weeks[0].week;
+    startDate = weekToDate(cutoff);
+  }
+  return st.purchases.filter(p => {
+    const d = new Date(p.date + 'T12:00:00');
+    return d >= startDate && d <= endDate;
+  });
+}
+
+function getPriceChangeFlag(item, cat, currentCost, barId) {
+  const bid = barId || activeBar;
+  const st = states[bid];
+  // Find this item in price history
+  const key = Object.keys(st.priceHistory || {}).find(k => {
+    const ph = st.priceHistory[k];
+    return ph.item.toLowerCase() === item.toLowerCase();
+  });
+  if (!key) return null;
+  const hist = (st.priceHistory[key].history || []).filter(h => h && h.cost != null);
+  if (hist.length < 2) return null;
+  const prev = hist[hist.length - 2].cost;
+  const curr = hist[hist.length - 1].cost;
+  if (Math.abs(curr - prev) < 0.01) return null;
+  return { prev, curr, delta: curr - prev, pct: ((curr - prev) / prev) * 100 };
+}
+
+function openDrillDown(catKey) {
+  if (activeBar === 'combined') {
+    showToast('Switch to a specific bar to drill down', true);
+    return;
+  }
+  _drillCatKey = catKey;
+  _drillSort = { field: 'total', dir: 'desc' };
+  renderDrillDown();
+  document.getElementById('drill-modal-overlay').classList.add('show');
+}
+
+function closeDrillDown() {
+  document.getElementById('drill-modal-overlay').classList.remove('show');
+  _drillCatKey = null;
+}
+
+function drillSort(field) {
+  if (_drillSort.field === field) {
+    _drillSort.dir = _drillSort.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    _drillSort = { field, dir: field === 'name' ? 'asc' : 'desc' };
+  }
+  renderDrillDown();
+}
+
+function renderDrillDown() {
+  const catDef = CAT_DEFS.find(c => c.key === _drillCatKey);
+  if (!catDef) return;
+
+  // Badge + title
+  const colors = { spirits:'#e67e22', beer:'#f1c40f', wine:'#8e44ad', mixers:'#16a085' };
+  const col = colors[_drillCatKey] || '#999';
+  const badge = document.getElementById('drill-cat-badge');
+  badge.textContent = catDef.label.toUpperCase();
+  badge.style.background = col + '22';
+  badge.style.color = col;
+  badge.style.border = `1px solid ${col}44`;
+  document.getElementById('drill-modal-title').textContent = catDef.label + ' — Purchase Detail';
+
+  // Get period purchases for this category
+  const allPurchases = getPeriodPurchases();
+  const catPurchases = allPurchases.filter(p => {
+    const ck = p.cat.toLowerCase();
+    return catDef.match.some(m => ck.includes(m));
+  });
+
+  // Period label
+  const latest = S().weeks[S().weeks.length - 1];
+  const periodLabel = latest
+    ? (latest.startDate && latest.endDate
+        ? `Period: ${latest.startDate} → ${latest.endDate}`
+        : `Latest period: ${getWeekLabel(latest.week)}`)
+    : 'Current period';
+  document.getElementById('drill-period-label').textContent = periodLabel;
+
+  // Aggregate by product name
+  const byProduct = {};
+  catPurchases.forEach(p => {
+    const key = p.item.toLowerCase().trim();
+    if (!byProduct[key]) byProduct[key] = { name: p.item, qty: 0, total: 0, cost: p.cost, vendor: p.vendor || '—', dates: [] };
+    byProduct[key].qty   += p.qty;
+    byProduct[key].total += p.total;
+    byProduct[key].cost   = p.cost; // use latest cost
+    byProduct[key].vendor = p.vendor || byProduct[key].vendor;
+    byProduct[key].dates.push(p.date);
+  });
+
+  let rows = Object.values(byProduct);
+
+  // Sort
+  rows.sort((a, b) => {
+    let av = a[_drillSort.field], bv = b[_drillSort.field];
+    if (_drillSort.field === 'name') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    if (_drillSort.dir === 'asc') return av > bv ? 1 : av < bv ? -1 : 0;
+    return av < bv ? 1 : av > bv ? -1 : 0;
+  });
+
+  // Sort indicators
+  ['name','qty','cost','total'].forEach(f => {
+    const el = document.getElementById('drill-sort-' + f);
+    if (el) el.textContent = _drillSort.field === f ? (_drillSort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+    const btn = el?.closest('.drill-sort-btn');
+    if (btn) btn.classList.toggle('active', _drillSort.field === f);
+  });
+
+  // Stats
+  const totalSpend = rows.reduce((s, r) => s + r.total, 0);
+  const totalUnits  = rows.reduce((s, r) => s + r.qty, 0);
+  const avgUnit     = totalUnits > 0 ? totalSpend / totalUnits : 0;
+  const latestWeek  = S().weeks[S().weeks.length - 1];
+  const catSalesKey = { spirits:'salesSpirits', beer:'salesBeer', wine:'salesWine', mixers:'salesMixers' }[_drillCatKey];
+  const catSales    = latestWeek && catSalesKey ? (latestWeek[catSalesKey] || 0) : 0;
+  const cogsPct     = catSales > 0 ? (totalSpend / catSales) * 100 : null;
+
+  const statData = [
+    { label: 'Total Spend',    val: fmt$(totalSpend),                      color: 'var(--text)' },
+    { label: 'COGS %',         val: cogsPct !== null ? fmtPct(cogsPct) : '—', color: cogsPct ? (cogsPct > 35 ? 'var(--accent2)' : cogsPct > 28 ? 'var(--accent)' : 'var(--green)') : 'var(--muted)' },
+    { label: 'SKUs Purchased', val: rows.length,                           color: 'var(--text)' },
+    { label: 'Avg Unit Cost',  val: avgUnit > 0 ? fmt$(avgUnit) : '—',    color: 'var(--muted)' },
+  ];
+  document.getElementById('drill-stat-row').innerHTML = statData.map(s =>
+    `<div class="drill-stat"><div class="drill-stat-label">${s.label}</div><div class="drill-stat-val" style="color:${s.color}">${s.val}</div></div>`
+  ).join('');
+
+  // Items list
+  const priceChangeCount = { up: 0, down: 0 };
+  document.getElementById('drill-items-body').innerHTML = rows.length === 0
+    ? `<div style="padding:20px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);">No ${catDef.label} purchases found in this period.</div>`
+    : rows.map(r => {
+        const chg = getPriceChangeFlag(r.name, _drillCatKey, r.cost);
+        let chgHtml = '';
+        if (chg) {
+          if (chg.delta > 0) {
+            priceChangeCount.up++;
+            chgHtml = `<span class="price-up-flag">▲ +${fmt$(chg.delta)}</span>`;
+          } else {
+            priceChangeCount.down++;
+            chgHtml = `<span class="price-down-flag">▼ ${fmt$(chg.delta)}</span>`;
+          }
+        }
+        const pctOfCat = totalSpend > 0 ? (r.total / totalSpend * 100).toFixed(1) : '0';
+        return `<div class="drill-item-row">
+          <div><div class="drill-item-name">${escHtml(r.name)}</div><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">${pctOfCat}% of category spend</div></div>
+          <div style="text-align:right;">${r.qty % 1 === 0 ? r.qty : r.qty.toFixed(2)}</div>
+          <div style="text-align:right;">${fmt$(r.cost)}</div>
+          <div style="text-align:right;font-weight:600;">${fmt$(r.total)}</div>
+          <div>${chgHtml || '<span style="color:var(--muted);font-size:10px;">—</span>'}</div>
+          <div style="color:var(--muted)">${escHtml(r.vendor)}</div>
+        </div>`;
+      }).join('');
+
+  const notes = [];
+  if (priceChangeCount.up)   notes.push(`⚠ ${priceChangeCount.up} item${priceChangeCount.up>1?'s':''} had a price increase this period`);
+  if (priceChangeCount.down) notes.push(`✓ ${priceChangeCount.down} item${priceChangeCount.down>1?'s':''} had a price decrease`);
+  document.getElementById('drill-footer-note').textContent = notes.join('  ·  ');
+}
+
+// ══════════════════════════════════════════════
+// PRINT / PDF REPORT
+// ══════════════════════════════════════════════
+function openPrintReport() {
+  const barId = activeBar === 'combined' ? null : activeBar;
+  const barIds = activeBar === 'combined' ? ['dh','lh'] : [activeBar];
+  const barLabel = activeBar === 'combined' ? 'Desert Hawk + The Low Horse'
+    : activeBar === 'dh' ? 'Desert Hawk' : 'The Low Horse';
+
+  // Gather data
+  const weeks = barIds.flatMap(b => states[b].weeks).sort((a,b) => a.week.localeCompare(b.week));
+  const latest = weeks[weeks.length - 1];
+  const prev   = weeks[weeks.length - 2];
+  if (!latest) { showToast('No period data to report yet', true); return; }
+
+  const periodLabel = latest.startDate && latest.endDate
+    ? `${latest.startDate} → ${latest.endDate}`
+    : getWeekLabel(latest.week);
+
+  // Category breakdown for current period
+  const catRows = CAT_DEFS.map(c => {
+    let spend = 0, count = 0;
+    barIds.forEach(b => {
+      const cats = getCategoryPurchases(b);
+      spend += cats[c.key]?.spend || 0;
+      count += cats[c.key]?.count || 0;
+    });
+    const catSalesKey = { spirits:'salesSpirits', beer:'salesBeer', wine:'salesWine', mixers:'salesMixers' }[c.key];
+    const sales = latest[catSalesKey] || 0;
+    const pct = sales > 0 ? (spend / sales * 100) : null;
+    return { label: c.label, spend, count, sales, pct };
+  });
+
+  // Top spend items this period (across all cats)
+  const allPurch = barIds.flatMap(b => getPeriodPurchases(b));
+  const byProduct = {};
+  allPurch.forEach(p => {
+    const k = p.item.toLowerCase();
+    if (!byProduct[k]) byProduct[k] = { name: p.item, cat: p.cat, total: 0, qty: 0, cost: p.cost, vendor: p.vendor || '' };
+    byProduct[k].total += p.total;
+    byProduct[k].qty   += p.qty;
+    byProduct[k].cost   = p.cost;
+  });
+  const topItems = Object.values(byProduct).sort((a,b) => b.total - a.total).slice(0, 15);
+
+  // Price changes this period
+  const priceChanges = [];
+  barIds.forEach(b => {
+    Object.values(states[b].priceHistory || {}).forEach(ph => {
+      const hist = (ph.history || []).filter(h => h && h.cost != null);
+      if (hist.length < 2) return;
+      const curr = hist[hist.length-1], prev2 = hist[hist.length-2];
+      const delta = curr.cost - prev2.cost;
+      if (Math.abs(delta) < 0.01) return;
+      // Only include if recent (within last 90 days)
+      const daysAgo = (Date.now() - new Date(curr.date+'T12:00:00')) / 86400000;
+      if (daysAgo > 90) return;
+      priceChanges.push({ item: ph.item, cat: ph.cat, prev: prev2.cost, curr: curr.cost, delta, date: curr.date, bar: b });
+    });
+  });
+  priceChanges.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  // Variance vs prior period
+  const variance = prev ? [
+    { label:'COGS %',     prev: prev.pct,       curr: latest.pct,       fmt: v => fmtPct(v),   lowerBetter:true },
+    { label:'Sales $',    prev: prev.sales,     curr: latest.sales,     fmt: v => fmt$(v),     lowerBetter:false },
+    { label:'COGS $',     prev: prev.cogs,      curr: latest.cogs,      fmt: v => fmt$(v),     lowerBetter:true },
+    { label:'Purchases $',prev: prev.purchases, curr: latest.purchases, fmt: v => fmt$(v),     lowerBetter:true },
+  ] : [];
+
+  const now = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const cogsClass2 = pct => pct > 35 ? 'color:#c0392b' : pct > 28 ? 'color:#c0841a' : 'color:#27ae60';
+
+  const html = `
+    <div class="pr-logo">POUR<span>COST</span></div>
+    <div class="pr-subtitle">${barLabel.toUpperCase()} &nbsp;·&nbsp; COGS REPORT &nbsp;·&nbsp; PERIOD: ${periodLabel} &nbsp;·&nbsp; Generated ${now}</div>
+
+    <div class="pr-section-title">Period Summary</div>
+    <div class="pr-kpi-row">
+      <div class="pr-kpi">
+        <div class="pr-kpi-label">COGS %</div>
+        <div class="pr-kpi-val" style="${cogsClass2(latest.pct)}">${fmtPct(latest.pct)}</div>
+        <div class="pr-kpi-sub">${prev ? `Prior: ${fmtPct(prev.pct)}` : 'First period'}</div>
+      </div>
+      <div class="pr-kpi">
+        <div class="pr-kpi-label">Total Sales</div>
+        <div class="pr-kpi-val">${fmt$(latest.sales)}</div>
+        <div class="pr-kpi-sub">${prev ? `Prior: ${fmt$(prev.sales)}` : ''}</div>
+      </div>
+      <div class="pr-kpi">
+        <div class="pr-kpi-label">Total COGS $</div>
+        <div class="pr-kpi-val">${fmt$(latest.cogs)}</div>
+        <div class="pr-kpi-sub">${prev ? `Prior: ${fmt$(prev.cogs)}` : ''}</div>
+      </div>
+      <div class="pr-kpi">
+        <div class="pr-kpi-label">Purchases</div>
+        <div class="pr-kpi-val">${fmt$(latest.purchases)}</div>
+        <div class="pr-kpi-sub">${latest.notes || ''}</div>
+      </div>
+    </div>
+
+    <div class="pr-section-title">COGS by Category</div>
+    <table class="pr-table">
+      <thead><tr><th>Category</th><th class="num">Purchases $</th><th class="num">Category Sales $</th><th class="num">COGS %</th><th class="num">SKUs</th></tr></thead>
+      <tbody>
+        ${catRows.map(c => `<tr>
+          <td>${c.label}</td>
+          <td class="num">${fmt$(c.spend)}</td>
+          <td class="num">${c.sales > 0 ? fmt$(c.sales) : '—'}</td>
+          <td class="num" style="${c.pct ? cogsClass2(c.pct) : ''};font-weight:700;">${c.pct !== null ? fmtPct(c.pct) : '—'}</td>
+          <td class="num">${c.count}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${variance.length ? `
+    <div class="pr-section-title">Period-over-Period Variance</div>
+    <table class="pr-table">
+      <thead><tr><th>Metric</th><th class="num">Prior Period</th><th class="num">This Period</th><th class="num">Change</th></tr></thead>
+      <tbody>
+        ${variance.map(v => {
+          const delta = v.curr - v.prev;
+          const isGood = v.lowerBetter ? delta <= 0 : delta >= 0;
+          const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—';
+          const style = delta === 0 ? '' : isGood ? 'color:#27ae60' : 'color:#c0392b';
+          const pctChg = v.prev !== 0 ? ((delta/Math.abs(v.prev))*100).toFixed(1) : '—';
+          return `<tr>
+            <td>${v.label}</td>
+            <td class="num">${v.fmt(v.prev)}</td>
+            <td class="num">${v.fmt(v.curr)}</td>
+            <td class="num" style="${style};font-weight:700;">${arrow} ${v.fmt(Math.abs(delta))} <span style="color:#888;font-weight:400;font-size:10px;">(${pctChg}%)</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>` : ''}
+
+    <div class="pr-section-title">Top Purchases This Period (by spend)</div>
+    <table class="pr-table">
+      <thead><tr><th>Product</th><th>Category</th><th>Vendor</th><th class="num">Qty</th><th class="num">Unit $</th><th class="num">Total $</th></tr></thead>
+      <tbody>
+        ${topItems.map(p => `<tr>
+          <td>${escHtml(p.name)}</td>
+          <td style="color:#666">${p.cat}</td>
+          <td style="color:#666">${escHtml(p.vendor)}</td>
+          <td class="num">${p.qty % 1 === 0 ? p.qty : p.qty.toFixed(2)}</td>
+          <td class="num">${fmt$(p.cost)}</td>
+          <td class="num" style="font-weight:700;">${fmt$(p.total)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${priceChanges.length ? `
+    <div class="pr-section-title">Recent Price Changes (last 90 days)</div>
+    <table class="pr-table">
+      <thead><tr><th>Product</th><th>Category</th><th class="num">Prior $</th><th class="num">Current $</th><th class="num">Change</th><th>Date</th></tr></thead>
+      <tbody>
+        ${priceChanges.map(c => {
+          const isUp = c.delta > 0;
+          return `<tr>
+            <td>${escHtml(c.item)}</td>
+            <td style="color:#666">${c.cat}</td>
+            <td class="num">${fmt$(c.prev)}</td>
+            <td class="num">${fmt$(c.curr)}</td>
+            <td class="num ${isUp ? 'pr-flag-up' : 'pr-flag-dn'}">${isUp ? '▲' : '▼'} ${fmt$(Math.abs(c.delta))} (${Math.abs(c.delta/c.prev*100).toFixed(1)}%)</td>
+            <td>${c.date}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>` : ''}
+
+    <div class="pr-footer">
+      <span>PourCost — ${barLabel}</span>
+      <span>Report generated ${now}</span>
+    </div>
+  `;
+
+  document.getElementById('print-report-page').innerHTML = html;
+  document.getElementById('print-report-overlay').style.display = 'block';
+}
+
+function closePrintReport() {
+  document.getElementById('print-report-overlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
+// ACTION ITEMS REPORT
+// ══════════════════════════════════════════════
+function openActionReport() {
+  const barIds  = activeBar === 'combined' ? ['dh','lh'] : [activeBar];
+  const barLabel = activeBar === 'combined' ? 'Desert Hawk + The Low Horse'
+    : activeBar === 'dh' ? 'Desert Hawk' : 'The Low Horse';
+
+  const now = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+  // Gather latest period info
+  const allWeeks = barIds.flatMap(b => states[b].weeks).sort((a,b) => a.week.localeCompare(b.week));
+  const latest = allWeeks[allWeeks.length - 1];
+  const prev   = allWeeks[allWeeks.length - 2];
+  const periodLabel = latest
+    ? (latest.startDate && latest.endDate ? `${latest.startDate} → ${latest.endDate}` : getWeekLabel(latest.week))
+    : 'No period data';
+
+  // ── Collect all action items ──
+  // Each item: { section, priority:'high'|'warn'|'info', name, detail, action }
+
+  const recount  = [];  // physical count issues
+  const pricing  = [];  // price spikes / cost changes
+  const cogs     = [];  // COGS % problems
+  const waste    = [];  // waste/comp anomalies
+  const unlinked = [];  // unconnected product names
+
+  // ── 1. RECOUNT CANDIDATES ──
+  // Products where depletion-implied usage is way off from what COGS suggests
+  barIds.forEach(b => {
+    const st = states[b];
+    const barName = BARS[b].name;
+    const deps = st.depletions || [];
+    // Group by product, latest 2 weeks
+    const byProd = {};
+    deps.forEach(d => {
+      if (!byProd[d.product]) byProd[d.product] = [];
+      byProd[d.product].push(d);
+    });
+    Object.entries(byProd).forEach(([prod, entries]) => {
+      if (entries.length < 2) return;
+      const sorted = [...entries].sort((a,b) => a.week.localeCompare(b.week));
+      const depletions = sorted.map(d => Math.max(0, d.startCount - d.endCount));
+      const avg = depletions.reduce((s,v)=>s+v,0) / depletions.length;
+      const latest2 = depletions[depletions.length - 1];
+      // Flag if latest depletion is >2.5× average (unusually high — possible count error or theft)
+      if (avg > 0 && latest2 > avg * 2.5) {
+        recount.push({
+          priority: 'high',
+          name: prod + (barIds.length > 1 ? ` (${barName})` : ''),
+          detail: `Depletion this period: ${latest2.toFixed(1)} units — ${((latest2/avg-1)*100).toFixed(0)}% above your ${avg.toFixed(1)}-unit average. This is unusually high.`,
+          action: 'Recount current stock. Verify no bottles are missing from the count area. Check waste log for unreported spillage or comps.'
+        });
+      }
+      // Flag if latest depletion is 0 but average is meaningful (possible missed count)
+      if (latest2 === 0 && avg >= 1) {
+        recount.push({
+          priority: 'warn',
+          name: prod + (barIds.length > 1 ? ` (${barName})` : ''),
+          detail: `Zero depletion recorded this period — average is ${avg.toFixed(1)} units/period. Could be a missed count.`,
+          action: 'Verify this product was included in the most recent inventory count.'
+        });
+      }
+    });
+  });
+
+  // ── 2. PRICE SPIKES ──
+  barIds.forEach(b => {
+    const st = states[b];
+    const barName = BARS[b].name;
+    Object.values(st.priceHistory || {}).forEach(ph => {
+      const hist = (ph.history || []).filter(h => h && h.cost != null);
+      if (hist.length < 2) return;
+      const curr = hist[hist.length - 1];
+      const p    = hist[hist.length - 2];
+      const delta = curr.cost - p.cost;
+      const pct   = (delta / p.cost) * 100;
+      if (delta <= 0) return;
+      const daysAgo = (Date.now() - new Date(curr.date+'T12:00:00')) / 86400000;
+      if (daysAgo > 60) return; // only recent increases
+      const priority = pct >= 15 ? 'high' : 'warn';
+      pricing.push({
+        priority,
+        name: ph.item + (barIds.length > 1 ? ` (${barName})` : ''),
+        detail: `Price increased from ${fmt$(p.cost)} → ${fmt$(curr.cost)} on ${curr.date} — a ${pct.toFixed(1)}% increase (+${fmt$(delta)} per unit).`,
+        action: pct >= 15
+          ? 'Significant increase — verify invoice wasn\'t a keying error. Consider adjusting menu price or finding alternate vendor.'
+          : 'Monitor. If increase persists, review menu pricing for this product.'
+      });
+    });
+  });
+  // Sort price issues: biggest % increase first
+  pricing.sort((a,b) => {
+    const ap = parseFloat(a.detail.match(/(\d+\.\d+)%/)?.[1]||0);
+    const bp = parseFloat(b.detail.match(/(\d+\.\d+)%/)?.[1]||0);
+    return bp - ap;
+  });
+
+  // ── 3. HIGH COGS % BY CATEGORY ──
+  if (latest) {
+    barIds.forEach(b => {
+      const st = states[b];
+      const barName = BARS[b].name;
+      const latestW = st.weeks[st.weeks.length - 1];
+      if (!latestW) return;
+      const cats = getCategoryPurchases(b);
+      CAT_DEFS.forEach(c => {
+        const spend = cats[c.key]?.spend || 0;
+        const salesKey = { spirits:'salesSpirits', beer:'salesBeer', wine:'salesWine', mixers:'salesMixers' }[c.key];
+        const sales = latestW[salesKey] || 0;
+        if (spend === 0 || sales === 0) return;
+        const pct = (spend / sales) * 100;
+        if (pct <= 30) return; // only flag warn+bad
+        // Find the top contributing products
+        const periodPurch = getPeriodPurchases(b).filter(p => {
+          const ck = p.cat.toLowerCase();
+          return c.match.some(m => ck.includes(m));
+        });
+        const topContrib = Object.values(
+          periodPurch.reduce((acc, p) => {
+            const k = p.item.toLowerCase();
+            if (!acc[k]) acc[k] = { name: p.item, total: 0 };
+            acc[k].total += p.total;
+            return acc;
+          }, {})
+        ).sort((a,b)=>b.total-a.total).slice(0,3).map(p=>`${p.name} (${fmt$(p.total)})`).join(', ');
+        cogs.push({
+          priority: pct > 38 ? 'high' : 'warn',
+          name: `${c.label} COGS` + (barIds.length > 1 ? ` — ${barName}` : ''),
+          detail: `${c.label} COGS is ${fmtPct(pct)} this period (${fmt$(spend)} purchases vs ${fmt$(sales)} sales). Target is below 30%.${topContrib ? ` Top items: ${topContrib}.` : ''}`,
+          action: pct > 38
+            ? 'Review all purchases in this category — check for over-ordering, returns not processed, or invoices scanned twice.'
+            : 'Monitor closely. Review top items in drill-down for price increases or over-ordering.'
+        });
+      });
+      // Also flag overall COGS if bad
+      if (latestW.pct > 35) {
+        cogs.push({
+          priority: latestW.pct > 42 ? 'high' : 'warn',
+          name: `Overall COGS ${fmtPct(latestW.pct)}` + (barIds.length > 1 ? ` — ${barName}` : ''),
+          detail: `Total COGS is ${fmtPct(latestW.pct)} for this period. ${fmt$(latestW.cogs)} cost on ${fmt$(latestW.sales)} sales.` +
+            (prev ? ` Prior period was ${fmtPct(prev.pct)}.` : ''),
+          action: 'Review category breakdown below. Focus on the highest COGS category first.'
+        });
+      }
+    });
+  }
+
+  // ── 4. WASTE / COMP SPIKES ──
+  barIds.forEach(b => {
+    const st = states[b];
+    const barName = BARS[b].name;
+    const logs = st.wasteLogs || [];
+    if (!logs.length) return;
+    // Total waste value in current period
+    const latestW = st.weeks[st.weeks.length - 1];
+    if (!latestW) return;
+    const periodWaste = logs.filter(l => {
+      if (!latestW.startDate || !latestW.endDate) return dateToWeek(l.date) === latestW.week;
+      const d = new Date(l.date + 'T12:00:00');
+      return d >= new Date(latestW.startDate+'T00:00:00') && d <= new Date(latestW.endDate+'T23:59:59');
+    });
+    const wasteTotal = periodWaste.reduce((s,l)=>s+l.value,0);
+    const wasteAsSalesPct = latestW.sales > 0 ? (wasteTotal / latestW.sales * 100) : 0;
+    if (wasteTotal > 0 && wasteAsSalesPct > 3) {
+      waste.push({
+        priority: wasteAsSalesPct > 6 ? 'high' : 'warn',
+        name: `High Waste/Comp Total` + (barIds.length > 1 ? ` — ${barName}` : ''),
+        detail: `${fmt$(wasteTotal)} in waste & comps this period — ${fmtPct(wasteAsSalesPct)} of sales. ${periodWaste.length} logged entries.`,
+        action: 'Review the Waste & Comps log for this period. Look for patterns by employee shift or day of week.'
+      });
+    }
+    // Flag top wasted items
+    const byItem = {};
+    periodWaste.forEach(l => {
+      if (!byItem[l.item]) byItem[l.item] = 0;
+      byItem[l.item] += l.value;
+    });
+    Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,2).forEach(([item, val]) => {
+      if (val < 20) return;
+      waste.push({
+        priority: 'info',
+        name: `Repeated Waste: ${item}` + (barIds.length > 1 ? ` (${barName})` : ''),
+        detail: `${fmt$(val)} in waste/comps logged for "${item}" this period.`,
+        action: 'Verify logs are accurate. If recurring, consider retraining or recipe review.'
+      });
+    });
+  });
+
+  // ── 5. UNLINKED NAMES ──
+  barIds.forEach(b => {
+    const st = states[b];
+    const barName = BARS[b].name;
+    const ignored = new Set(st.ignoredPosItems || []);
+    const unresolved = [...new Set(st.posItems || [])].filter(n => !resolveProduct(n, b) && !ignored.has(n));
+    const invUnresolved = st.unresolvedInvItems || [];
+    if (unresolved.length) {
+      unlinked.push({
+        priority: 'warn',
+        name: `${unresolved.length} POS Item${unresolved.length>1?'s':''} Not Connected` + (barIds.length > 1 ? ` — ${barName}` : ''),
+        detail: `Sales from these POS items are not attributed to any product: ${unresolved.slice(0,5).map(n=>`"${n}"`).join(', ')}${unresolved.length>5?` + ${unresolved.length-5} more`:''}. This means their sales aren't included in category COGS calculations.`,
+        action: 'Go to Connections tab and assign each item to a product or ignore it.'
+      });
+    }
+    if (invUnresolved.length) {
+      unlinked.push({
+        priority: 'info',
+        name: `${invUnresolved.length} Inventory Item${invUnresolved.length>1?'s':''} Without Cost` + (barIds.length > 1 ? ` — ${barName}` : ''),
+        detail: `These inventory items have no unit cost on file: ${invUnresolved.slice(0,4).map(n=>`"${n}"`).join(', ')}${invUnresolved.length>4?` + ${invUnresolved.length-4} more`:''}. Inventory valuations will be incomplete.`,
+        action: 'Go to Connections tab and enter a unit cost for each item, or import an invoice that includes these products.'
+      });
+    }
+  });
+
+  // ── Build HTML ──
+  const totalIssues = recount.length + pricing.length + cogs.length + waste.length + unlinked.length;
+
+  function renderSection(icon, title, items, emptyMsg) {
+    if (!items.length) return '';
+    return `<div class="ar-section">
+      <div class="ar-section-header">
+        <span class="ar-section-icon">${icon}</span>
+        <span class="ar-section-title">${title}</span>
+        <span class="ar-section-count">${items.length} item${items.length>1?'s':''}</span>
+      </div>
+      ${items.map(item => `
+        <div class="ar-item priority-${item.priority}">
+          <div class="ar-item-top">
+            <div class="ar-checkbox"></div>
+            <div class="ar-item-name">${escHtml(item.name)}</div>
+            <span class="ar-item-tag ${item.priority}">${item.priority === 'high' ? 'URGENT' : item.priority === 'warn' ? 'WATCH' : 'NOTE'}</span>
+          </div>
+          <div class="ar-item-detail">${item.detail}</div>
+          <div class="ar-item-action">→ ${item.action}</div>
+          <div style="padding-left:24px;margin-top:6px;">
+            <div class="ar-notes-label">Notes / Follow-up:</div>
+            <div class="ar-notes-box"></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  const html = `
+    <div class="ar-logo">POUR<span>COST</span></div>
+    <div class="ar-subtitle">${barLabel.toUpperCase()} &nbsp;·&nbsp; ACTION ITEMS &nbsp;·&nbsp; ${now}</div>
+    <div class="ar-period">Period: ${periodLabel} &nbsp;·&nbsp;
+      ${totalIssues === 0
+        ? '<span style="color:#27ae60;font-weight:700;">✓ No action items — all clear</span>'
+        : `<span style="color:#c0392b;font-weight:700;">${totalIssues} item${totalIssues>1?'s':''} need attention</span>
+           &nbsp;·&nbsp; ${[recount,pricing,cogs,waste,unlinked].flat().filter(i=>i.priority==='high').length} urgent
+           &nbsp;·&nbsp; ${[recount,pricing,cogs,waste,unlinked].flat().filter(i=>i.priority==='warn').length} watch`
+      }
+    </div>
+
+    ${totalIssues === 0
+      ? `<div class="ar-empty">✓ ALL CLEAR — No action items for this period</div>`
+      : `
+        ${renderSection('🔴', 'Recount These Items', recount)}
+        ${renderSection('💰', 'Price Increases — Verify & Review', pricing)}
+        ${renderSection('📊', 'High COGS % by Category', cogs)}
+        ${renderSection('⚠', 'Waste & Comp Anomalies', waste)}
+        ${renderSection('🔗', 'Unconnected Product Names', unlinked)}
+      `
+    }
+
+    <div class="ar-footer">
+      <span>PourCost Action Items — ${barLabel}</span>
+      <span>Generated ${now}</span>
+    </div>
+  `;
+
+  document.getElementById('action-report-page').innerHTML = html;
+  document.getElementById('action-report-overlay').style.display = 'block';
+}
+
+function closeActionReport() {
+  document.getElementById('action-report-overlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
+// PRODUCT MIX REPORT PARSER  (Toast Items.csv)
+// Handles both raw Items.csv and the .zip export
+// ══════════════════════════════════════════════
+
+// Parse Toast Items.csv → { itemName: { salesCat, qtySold, voidAmt } }
+function parseProductMixCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
+  const col = k => headers.findIndex(h => h.includes(k));
+
+  const colItem    = col('item');
+  const colCat     = headers.findIndex(h => h === 'sales category' || h.includes('sales cat'));
+  const colQty     = headers.findIndex(h => h === 'qty sold' || h === 'qty');
+  const colVoid    = headers.findIndex(h => h.includes('void amount'));
+
+  if (colItem < 0 || colQty < 0) return null;
+
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCsvLine(lines[i]);
+    if (!row || row.length < 3) continue;
+    const name    = (row[colItem] || '').replace(/^"|"$/g,'').trim();
+    const salesCat = colCat >= 0 ? (row[colCat] || '').replace(/^"|"$/g,'').trim() : '';
+    const qty     = parseFloat((row[colQty] || '0').replace(/^"|"$/g,'')) || 0;
+    const voidAmt = colVoid >= 0 ? parseFloat((row[colVoid]||'0').replace(/^"|"$/g,''))||0 : 0;
+    if (!name || name === '') continue;
+    result[name] = { salesCat, qtySold: qty, voidAmt };
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+// Handle upload — accepts .csv directly or .zip containing Items.csv
+function handleProductMixUpload(input) {
+  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
+  const file = input.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('modifier-status');
+  const boxEl    = document.getElementById('upload-modifier');
+  statusEl.textContent = 'Reading...';
+
+  const processCSV = (text, filename) => {
+    const result = parseProductMixCSV(text);
+    if (!result) {
+      statusEl.textContent = '⚠ Could not parse — check file format';
+      showToast('Could not parse Product Mix report', true);
+      return;
+    }
+    const liquorItems = Object.entries(result).filter(([,v]) =>
+      v.salesCat === 'Liquor' || v.salesCat === 'Draft Beer' || v.salesCat === 'Bottled Beer'
+    );
+    const periodKey = document.getElementById('entry-start-date').value || 'latest';
+    if (!S().modifierData) S().modifierData = {};
+    S().modifierData[periodKey] = {
+      uploadedAt: new Date().toISOString(),
+      filename,
+      data: result
+    };
+    saveLocal();
+    const spiritCount = liquorItems.filter(([,v]) => v.salesCat === 'Liquor').length;
+    const beerCount   = liquorItems.filter(([,v]) => v.salesCat !== 'Liquor').length;
+    statusEl.textContent = `✓ ${spiritCount} spirit/cocktail items · ${beerCount} beer items`;
+    boxEl.classList.add('loaded');
+    showToast(`✓ Product Mix loaded — ${liquorItems.length} beverage items`);
+  };
+
+  if (file.name.endsWith('.zip')) {
+    // Use JSZip if available, else instruct user to upload Items.csv directly
+    if (typeof JSZip === 'undefined') {
+      // Load JSZip dynamically
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+      script.onload = () => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const zip = await JSZip.loadAsync(e.target.result);
+            const itemsFile = zip.file('Items.csv') || zip.file(/Items\.csv$/i)[0];
+            if (!itemsFile) { statusEl.textContent = '⚠ Items.csv not found in zip'; return; }
+            const text = await itemsFile.async('string');
+            processCSV(text, file.name);
+          } catch(err) { statusEl.textContent = '⚠ Could not read zip file'; }
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      document.head.appendChild(script);
+    } else {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const zip = await JSZip.loadAsync(e.target.result);
+          const itemsFile = zip.file('Items.csv') || zip.file(/Items\.csv$/i)[0];
+          if (!itemsFile) { statusEl.textContent = '⚠ Items.csv not found in zip'; return; }
+          const text = await itemsFile.async('string');
+          processCSV(text, file.name);
+        } catch(err) { statusEl.textContent = '⚠ Could not read zip file'; }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  } else {
+    const reader = new FileReader();
+    reader.onload = (e) => processCSV(e.target.result, file.name);
+    reader.readAsText(file);
+  }
+}
+
+// ══════════════════════════════════════════════
+// SPIRIT CONSUMPTION ENGINE
+// Calculates expected oz consumed per spirit by combining:
+//   1. Direct spirit sales (Jameson sold 4 × pour size)
+//   2. Cocktail sales routed through Menu Costing recipes
+// Returns: { spiritNameLower: { name, ozConsumed, sources:[{via, qty, oz}] } }
+// ══════════════════════════════════════════════
+
+const OZ_PER_BOTTLE = { '1750': 59.17, '1000': 33.81, '750': 25.36, '375': 12.68 };
+
+function buildSpiritConsumption(salesData, menuItems) {
+  const consumption = {}; // key: lowercased spirit name
+
+  const addOz = (spiritName, oz, source) => {
+    const k = spiritName.toLowerCase().trim();
+    if (!consumption[k]) consumption[k] = { name: spiritName, ozConsumed: 0, sources: [] };
+    consumption[k].ozConsumed += oz;
+    consumption[k].sources.push(source);
+  };
+
+  // Standard pour size for direct spirit sales (when rung as the spirit itself)
+  // The Items.csv qty = number of times rung — each ring is 1 pour
+  // Default pour is 1.5oz (most common well/call pour); can be overridden by recipe
+  const DEFAULT_POUR_OZ = 1.5;
+
+  Object.entries(salesData).forEach(([itemName, item]) => {
+    if (item.salesCat !== 'Liquor') return;
+    const qty = item.qtySold || 0;
+    if (qty <= 0) return;
+
+    // Try to find a recipe for this item in Menu Costing
+    const recipe = menuItems.find(m => similarity(m.name, itemName) >= 0.7);
+
+    if (recipe && recipe.ingredients && recipe.ingredients.length) {
+      // Route through recipe ingredients
+      recipe.ingredients.forEach(ing => {
+        if (!ing.name) return;
+        const unit = (ing.unit || 'oz').toLowerCase();
+        let oz = parseFloat(ing.amount) || 0;
+        if (unit === 'ml') oz = oz / 29.5735;
+        else if (unit === 'bottle') oz = oz * 25.36; // assume 750ml
+        else if (unit !== 'oz') return; // skip non-liquid (garnish etc)
+        if (oz <= 0) return;
+        addOz(ing.name, oz * qty, { via: itemName, qty, ozEach: oz, type: 'recipe' });
+      });
+    } else {
+      // No recipe — treat as a direct pour of the item itself at default pour
+      // If name looks like a specific spirit (not a cocktail), add directly
+      addOz(itemName, DEFAULT_POUR_OZ * qty, { via: itemName, qty, ozEach: DEFAULT_POUR_OZ, type: 'direct' });
+    }
+  });
+
+  return consumption;
+}
+
+// ══════════════════════════════════════════════
+// SPIRIT VARIANCE REPORT
+// ══════════════════════════════════════════════
+
+function openSpiritVarianceReport() {
+  if (activeBar === 'combined') { showToast('Switch to a specific bar first', true); return; }
+
+  const st = S();
+  const barLabel  = activeBar === 'dh' ? 'Desert Hawk' : 'The Low Horse';
+  const now       = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  const latest    = st.weeks[st.weeks.length - 1];
+  const periodLabel = latest
+    ? (latest.startDate && latest.endDate ? `${latest.startDate} → ${latest.endDate}` : getWeekLabel(latest.week))
+    : 'No period on file';
+
+  // Get most recent Product Mix upload
+  const modData    = st.modifierData || {};
+  const modKeys    = Object.keys(modData).sort();
+  const latestMod  = modKeys.length ? modData[modKeys[modKeys.length - 1]] : null;
+  const salesData  = latestMod ? latestMod.data : null;
+  const menuItems  = st.menuItems || [];
+
+  // Get depletion data
+  const allDeps = st.depletions || [];
+  const periodDeps = latest
+    ? allDeps.filter(d => d.week === latest.week)
+    : allDeps;
+
+  // Build consumption map from sales + recipes
+  const consumption = salesData ? buildSpiritConsumption(salesData, menuItems) : {};
+
+  // ── Bottled beer variance (simple: qty sold vs count) ──
+  const beerRows = [];
+  if (salesData) {
+    Object.entries(salesData).forEach(([name, item]) => {
+      if (item.salesCat !== 'Bottled Beer') return;
+      const qty = item.qtySold || 0;
+      if (qty <= 0 && item.voidAmt <= 0) return;
+      // Find matching depletion entry
+      const dep = periodDeps.find(d => similarity(d.product, name) >= 0.6);
+      const actualUsed = dep ? (dep.startCount - dep.endCount) : null;
+      const variance   = actualUsed !== null ? actualUsed - qty : null;
+      beerRows.push({
+        product: name,
+        qtySold: qty,
+        actualUsed,
+        variance,
+        costPerUnit: dep?.costPerBottle || 0,
+        dollarVar: variance !== null && dep?.costPerBottle ? variance * dep.costPerBottle : null,
+        status: variance === null ? 'nocount' : Math.abs(variance) > 5 ? 'high' : Math.abs(variance) > 2 ? 'watch' : 'ok'
+      });
+    });
+  }
+
+  // ── Spirit variance rows ──
+  const spiritRows = [];
+
+  // For each depletion entry, find consumption from sales data
+  periodDeps.forEach(dep => {
+    const catL = (dep.cat || '').toLowerCase();
+    const isSpirit = catL.includes('spirit') || catL.includes('whiskey') || catL.includes('vodka') ||
+                     catL.includes('gin') || catL.includes('rum') || catL.includes('tequila') ||
+                     catL.includes('bourbon') || catL.includes('liqueur') || catL.includes('liquor') ||
+                     catL.includes('mezcal') || catL.includes('brandy') || catL.includes('cognac');
+    if (!isSpirit) return;
+
+    const actualUsed = dep.startCount - dep.endCount;
+    const sizeKey    = dep.sizeKey || '750';
+    const ozPerBottle = OZ_PER_BOTTLE[sizeKey] || 25.36;
+
+    // Find best consumption match
+    let bestKey = null, bestScore = 0;
+    Object.keys(consumption).forEach(k => {
+      const s = similarity(dep.product, consumption[k].name);
+      if (s > bestScore && s >= 0.4) { bestScore = s; bestKey = k; }
+    });
+
+    const cons         = bestKey ? consumption[bestKey] : null;
+    const expectedOz   = cons ? cons.ozConsumed : null;
+    const expectedBtl  = expectedOz !== null ? expectedOz / ozPerBottle : null;
+    const variance     = expectedBtl !== null ? actualUsed - expectedBtl : null;
+    const varPct       = expectedBtl > 0 ? (variance / expectedBtl) * 100 : null;
+
+    const status = variance === null ? 'nodata'
+      : Math.abs(variance) > 0.75 || (varPct !== null && Math.abs(varPct) > 20) ? 'high'
+      : Math.abs(variance) > 0.35 ? 'watch'
+      : 'ok';
+
+    spiritRows.push({
+      product: dep.product, sizeKey, actualUsed,
+      expectedBtl, variance, varPct,
+      costPerBottle: dep.costPerBottle || 0,
+      dollarVar: variance !== null && dep.costPerBottle ? variance * dep.costPerBottle : null,
+      status,
+      sources: cons?.sources || [],
+      matchedName: cons?.name || null,
+      hasRecipe: cons?.sources.some(s => s.type === 'recipe') || false,
+      noSalesData: !salesData
+    });
+  });
+
+  // Spirits in sales data with NO depletion entry
+  const nocountSpirits = [];
+  Object.values(consumption).forEach(c => {
+    const matched = spiritRows.some(r => similarity(r.product, c.name) >= 0.4);
+    if (!matched) nocountSpirits.push(c);
+  });
+
+  // Sort: high → watch → nodata/nocount → ok
+  const rank = { high:0, watch:1, nodata:2, nocount:2, ok:3 };
+  spiritRows.sort((a,b) => (rank[a.status]||3) - (rank[b.status]||3) || Math.abs(b.variance||0) - Math.abs(a.variance||0));
+  beerRows.sort((a,b)   => (rank[a.status]||3) - (rank[b.status]||3) || Math.abs(b.variance||0) - Math.abs(a.variance||0));
+
+  // Summary
+  const flaggedSpirits  = spiritRows.filter(r => r.status === 'high').length;
+  const flaggedBeer     = beerRows.filter(r => r.status === 'high').length;
+  const totalDollarRisk = [...spiritRows, ...beerRows].reduce((s,r) => s + Math.max(0, r.dollarVar||0), 0);
+  const uncoveredCocktails = menuItems.filter(m => {
+    if (!salesData) return false;
+    const sold = Object.entries(salesData).find(([n]) => similarity(n, m.name) >= 0.7);
+    return sold && sold[1].qtySold > 0;
+  });
+
+  const sizeLabel = k => ({ '1750':'1.75L','1000':'1L','750':'750ml','375':'375ml' }[k] || k);
+
+  const renderSpiritRow = r => {
+    const nodata = r.noSalesData || r.status === 'nodata';
+    const badge = r.status === 'high'   ? `<span class="svr-recount">RECOUNT</span>`
+      : r.status === 'watch'  ? `<span class="svr-recount" style="background:#fef3e2;color:#c0841a;">WATCH</span>`
+      : r.status === 'nodata' ? `<span style="background:#f0f0f0;color:#999;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO SALES DATA</span>`
+      : `<span class="svr-ok-badge">OK</span>`;
+
+    const varDisp = r.variance !== null
+      ? `<span class="${Math.abs(r.variance)>0.35?(r.variance>0?'svr-var-neg':'svr-var-pos'):'svr-var-ok'}">${r.variance>0?'+':''}${r.variance.toFixed(2)}</span>${r.varPct!==null?`<div style="font-size:9px;color:#999;">${r.varPct>0?'+':''}${r.varPct.toFixed(0)}%</div>`:''}`
+      : '<span style="color:#ccc">—</span>';
+
+    // Source breakdown tooltip text
+    const sourcesByItem = {};
+    r.sources.forEach(s => {
+      if (!sourcesByItem[s.via]) sourcesByItem[s.via] = 0;
+      sourcesByItem[s.via] += s.ozEach * s.qty;
+    });
+    const sourceHint = Object.entries(sourcesByItem)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,3)
+      .map(([via, oz]) => `${via}: ${oz.toFixed(1)}oz`)
+      .join(' · ');
+
+    return `<tr class="${r.status==='high'?'problem':r.status==='ok'?'ok':''}">
+      <td>
+        <div style="font-weight:700;font-size:12px;">${escHtml(r.product)}</div>
+        <div style="font-size:9px;color:#999;margin-top:2px;">
+          ${sizeLabel(r.sizeKey)}
+          ${r.hasRecipe ? ' · <span style="color:#27ae60;">recipe ✓</span>' : r.sources.length ? ' · direct pour assumed' : ''}
+          ${sourceHint ? `<br>${sourceHint}` : ''}
+        </div>
+      </td>
+      <td class="num">${r.actualUsed !== null ? r.actualUsed.toFixed(2) : '—'}</td>
+      <td class="num">${r.expectedBtl !== null ? r.expectedBtl.toFixed(2) : '—'}</td>
+      <td class="num">${varDisp}</td>
+      <td class="num">${r.dollarVar !== null && r.dollarVar > 0 ? `<span style="color:#c0392b;">$${r.dollarVar.toFixed(2)}</span>` : '—'}</td>
+      <td>${badge}</td>
+    </tr>
+    ${r.status==='high'||r.status==='watch'?`<tr class="${r.status==='high'?'problem':''}"><td colspan="6" style="padding:0 8px 8px;">
+      <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Notes / recount result:</div>
+      <div class="svr-notes"></div>
+    </td></tr>`:''}`;
+  };
+
+  const renderBeerRow = r => {
+    const badge = r.status === 'high'    ? `<span class="svr-recount">RECOUNT</span>`
+      : r.status === 'watch'   ? `<span class="svr-recount" style="background:#fef3e2;color:#c0841a;">WATCH</span>`
+      : r.status === 'nocount' ? `<span style="background:#e8f4fc;color:#2980b9;border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;">NO COUNT</span>`
+      : `<span class="svr-ok-badge">OK</span>`;
+    const varDisp = r.variance !== null
+      ? `<span class="${Math.abs(r.variance)>2?(r.variance>0?'svr-var-neg':'svr-var-pos'):'svr-var-ok'}">${r.variance>0?'+':''}${r.variance.toFixed(0)}</span>`
+      : '—';
+    return `<tr class="${r.status==='high'?'problem':r.status==='ok'?'ok':''}">
+      <td style="font-weight:700;font-size:12px;">${escHtml(r.product)}</td>
+      <td class="num">${r.actualUsed !== null ? r.actualUsed.toFixed(0) : '—'}</td>
+      <td class="num">${r.qtySold.toFixed(0)}</td>
+      <td class="num">${varDisp}</td>
+      <td class="num">${r.dollarVar !== null && r.dollarVar > 0 ? `<span style="color:#c0392b;">$${r.dollarVar.toFixed(2)}</span>` : '—'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  };
+
+  // Cocktail coverage summary
+  const cocktailsWithRecipe = menuItems.filter(m => {
+    if (!salesData) return false;
+    const soldEntry = Object.entries(salesData).find(([n]) => similarity(n, m.name) >= 0.7);
+    return soldEntry && soldEntry[1].salesCat === 'Liquor';
+  });
+  const cocktailsWithoutRecipe = salesData ? Object.entries(salesData)
+    .filter(([n, v]) => v.salesCat === 'Liquor' && v.qtySold > 5)
+    .filter(([n]) => !menuItems.some(m => similarity(m.name, n) >= 0.7))
+    .sort((a,b) => b[1].qtySold - a[1].qtySold)
+    .slice(0, 8) : [];
+
+  const html = `
+    <div class="svr-logo">POUR<span>COST</span></div>
+    <div class="svr-subtitle">
+      ${barLabel.toUpperCase()} &nbsp;·&nbsp; SPIRIT VARIANCE REPORT &nbsp;·&nbsp; ${periodLabel} &nbsp;·&nbsp; ${now}
+      ${latestMod ? `<br>Sales data: ${latestMod.filename}` : '<br><span style="color:#c0392b;">⚠ No Product Mix uploaded — expected usage unavailable</span>'}
+    </div>
+
+    <div class="svr-summary-row">
+      <div class="svr-stat"><div class="svr-stat-label">Spirits Tracked</div><div class="svr-stat-val">${spiritRows.length}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">Need Recount</div><div class="svr-stat-val" style="color:#c0392b;">${flaggedSpirits + flaggedBeer}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">Recipe Coverage</div><div class="svr-stat-val" style="color:${cocktailsWithRecipe.length>0?'#27ae60':'#c0841a'};">${cocktailsWithRecipe.length}/${menuItems.length}</div></div>
+      <div class="svr-stat"><div class="svr-stat-label">$ At Risk</div><div class="svr-stat-val" style="color:#c0392b;">${totalDollarRisk > 0 ? '$'+totalDollarRisk.toFixed(2) : '—'}</div></div>
+    </div>
+
+    ${cocktailsWithoutRecipe.length ? `
+    <div style="background:#fffbe6;border:1px solid #f0c040;border-radius:3px;padding:10px 14px;margin-bottom:16px;font-size:11px;">
+      <strong>⚠ High-volume items without a recipe in Menu Costing</strong> — consumption estimated at ${DEFAULT_POUR_OZ}oz/sale. Add recipes for accuracy:<br><br>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
+        ${cocktailsWithoutRecipe.map(([n,v]) => `<span style="background:#fff;border:1px solid #f0c040;padding:3px 10px;border-radius:3px;font-weight:700;">${escHtml(n)} <span style="color:#888;font-weight:400;">(${v.qtySold} sold)</span></span>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div style="font-size:10px;color:#666;margin-bottom:14px;line-height:1.8;background:#f9f9f9;border:1px solid #eee;padding:10px 14px;border-radius:3px;">
+      <strong>How to read this:</strong> &nbsp;
+      <strong>Actual Used</strong> = opening count − closing count (bottles). &nbsp;
+      <strong>Expected Used</strong> = oz sold from Toast ÷ bottle oz (via recipes where available, otherwise ${DEFAULT_POUR_OZ}oz assumed). &nbsp;
+      <strong>Variance (+)</strong> = used more than sold — missing product. &nbsp;
+      <span style="color:#27ae60;">Recipe ✓</span> = consumption routed through your Menu Costing recipe.
+    </div>
+
+    ${spiritRows.length ? `
+    <div class="svr-section-title">🥃 Spirits & Liquor</div>
+    <table class="svr-table">
+      <thead><tr>
+        <th>Product</th>
+        <th class="num">Actual<br>Used (btl)</th>
+        <th class="num">Expected<br>Used (btl)</th>
+        <th class="num">Variance</th>
+        <th class="num">$ Risk</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody>${spiritRows.map(renderSpiritRow).join('')}</tbody>
+    </table>` : `<div style="color:#999;font-size:12px;padding:16px 0;">No spirit depletion entries for this period. Add bottle counts in the Bottle Depletion tab.</div>`}
+
+    ${beerRows.length ? `
+    <div class="svr-section-title">🍺 Packaged Beer & RTD</div>
+    <table class="svr-table">
+      <thead><tr>
+        <th>Product</th>
+        <th class="num">Actual<br>Used (cans)</th>
+        <th class="num">POS<br>Sold</th>
+        <th class="num">Variance</th>
+        <th class="num">$ Risk</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody>${beerRows.map(renderBeerRow).join('')}</tbody>
+    </table>` : ''}
+
+    ${nocountSpirits.length ? `
+    <div class="svr-section-title">⚠ Spirits Sold But Not Counted</div>
+    <div style="font-size:11px;color:#666;margin-bottom:8px;">These appeared in your sales data but have no matching depletion entry. Add them to Bottle Depletion for full tracking.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+      ${nocountSpirits.sort((a,b)=>b.ozConsumed-a.ozConsumed).slice(0,12).map(c =>
+        `<span style="background:#e8f4fc;color:#2980b9;border-radius:3px;padding:4px 10px;font-size:11px;font-weight:700;">${escHtml(c.name)} <span style="font-weight:400;">(${c.ozConsumed.toFixed(1)}oz sold)</span></span>`
+      ).join('')}
+    </div>` : ''}
+
+    <div class="svr-footer">
+      <span>PourCost Spirit Variance — ${barLabel}</span>
+      <span>Generated ${now}</span>
+    </div>
+  `;
+
+  document.getElementById('variance-report-page').innerHTML = html;
+  document.getElementById('variance-report-overlay').style.display = 'block';
+}
+
+const DEFAULT_POUR_OZ = 1.5;
+
+function closeSpiritVarianceReport() {
+  document.getElementById('variance-report-overlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
 // CATEGORY BREAKDOWN
 // ══════════════════════════════════════════════
 const CAT_DEFS = [
@@ -6288,5 +7499,63 @@ async function main(){
 
 main();
 </script>
+
+<!-- CATEGORY DRILL-DOWN MODAL -->
+<div class="modal-overlay" id="drill-modal-overlay">
+  <div class="modal drill-modal">
+    <div class="drill-header-bar">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <span class="drill-cat-badge" id="drill-cat-badge">BEER</span>
+          <div class="modal-title" style="margin:0;" id="drill-modal-title">Beer Purchases</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);" id="drill-period-label">Current period</div>
+      </div>
+      <button class="btn btn-outline" style="margin-left:auto;padding:5px 14px;font-size:11px;" onclick="closeDrillDown()">✕ Close</button>
+    </div>
+    <div class="drill-stat-row" id="drill-stat-row"></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+      <div class="drill-item-row drill-header">
+        <div class="drill-sort-btn" onclick="drillSort('name')">Product <span id="drill-sort-name"></span></div>
+        <div class="drill-sort-btn num" onclick="drillSort('qty')" style="text-align:right;">Qty <span id="drill-sort-qty"></span></div>
+        <div class="drill-sort-btn num" onclick="drillSort('cost')" style="text-align:right;">Unit $ <span id="drill-sort-cost"></span></div>
+        <div class="drill-sort-btn num" onclick="drillSort('total')" style="text-align:right;">Total $ <span id="drill-sort-total"></span></div>
+        <div style="text-align:right;">vs Prior</div>
+        <div>Vendor</div>
+      </div>
+      <div id="drill-items-body"></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px;" id="drill-footer-note"></div>
+  </div>
+</div>
+
+<!-- PRINT REPORT OVERLAY -->
+<div id="print-report-overlay">
+  <div class="print-report-page" id="print-report-page">
+    <!-- filled dynamically -->
+  </div>
+  <div style="text-align:center;margin-top:20px;display:flex;gap:10px;justify-content:center;" id="print-report-btns">
+    <button onclick="window.print()" style="background:#c0841a;color:#fff;border:none;padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;font-weight:700;">⎙ Print / Save PDF</button>
+    <button onclick="closePrintReport()" style="background:none;color:#fff;border:1px solid rgba(255,255,255,0.3);padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;">✕ Close</button>
+  </div>
+</div>
+<!-- SPIRIT VARIANCE REPORT OVERLAY -->
+<div id="variance-report-overlay">
+  <div class="variance-report-page" id="variance-report-page"></div>
+  <div style="text-align:center;margin-top:20px;display:flex;gap:10px;justify-content:center;" id="variance-report-btns">
+    <button onclick="window.print()" style="background:#c0841a;color:#fff;border:none;padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;font-weight:700;">⎙ Print / Save PDF</button>
+    <button onclick="closeSpiritVarianceReport()" style="background:none;color:#fff;border:1px solid rgba(255,255,255,0.3);padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;">✕ Close</button>
+  </div>
+</div>
+<!-- ACTION ITEMS REPORT OVERLAY -->
+<div id="action-report-overlay">
+  <div class="action-report-page" id="action-report-page">
+    <!-- filled dynamically -->
+  </div>
+  <div style="text-align:center;margin-top:20px;display:flex;gap:10px;justify-content:center;" id="action-report-btns">
+    <button onclick="window.print()" style="background:#c0392b;color:#fff;border:none;padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;font-weight:700;">⎙ Print Checklist</button>
+    <button onclick="closeActionReport()" style="background:none;color:#fff;border:1px solid rgba(255,255,255,0.3);padding:10px 28px;font-size:13px;border-radius:3px;cursor:pointer;font-family:Arial,sans-serif;">✕ Close</button>
+  </div>
+</div>
 </body>
 </html>
