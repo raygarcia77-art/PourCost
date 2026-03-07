@@ -5944,13 +5944,15 @@ function handleAllLevelsUpload(input) {
       reader.onload = async e => {
         try {
           const zip = await JSZip.loadAsync(e.target.result);
-          // Look for "All levels.csv" (case-insensitive)
-          const entry = zip.file(/^all levels\.csv$/i)[0] || zip.file(/all.?levels/i)[0];
-          if (!entry) {
+          // Find "All levels.csv" case-insensitively
+          const allFiles = Object.keys(zip.files);
+          const entryName = allFiles.find(n => n.toLowerCase().replace(/\s+/g,' ').trim() === 'all levels.csv')
+                         || allFiles.find(n => n.toLowerCase().includes('all level'));
+          if (!entryName) {
             statusEl.textContent = '⚠ "All levels.csv" not found in zip — check export settings';
             showToast('All levels.csv not found in zip', true); return;
           }
-          const text = await entry.async('string');
+          const text = await zip.files[entryName].async('string');
           processText(text, file.name);
         } catch(err) {
           console.error('JSZip error:', err);
