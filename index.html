@@ -5874,6 +5874,7 @@ function handleAllLevelsUpload(input) {
   statusEl.textContent = 'Reading...';
 
   const processText = (text, filename) => {
+    try {
     const result = parseAllLevelsCSV(text);
     if (!result || !result.items || !result.modifiers) {
       console.error('parseAllLevelsCSV returned:', result);
@@ -5936,6 +5937,11 @@ function handleAllLevelsUpload(input) {
     document.getElementById('upload-all-levels').classList.add('loaded');
     validateVariancePair();
     showToast(`✓ All Levels loaded — sales auto-filled: Liquor $${salesTotals.liquor.toFixed(0)} · Beer $${totalBeer.toFixed(0)} · Wine $${salesTotals.wine.toFixed(0)}`);
+    } catch(err) {
+      console.error('processText failed:', err);
+      statusEl.textContent = '⚠ Error processing file: ' + (err.message||'unknown');
+      showToast('Error: ' + (err.message||'unknown'), true);
+    }
   };
 
   if (file.name.toLowerCase().endsWith('.zip')) {
@@ -6014,7 +6020,16 @@ function handleAllLevelsUpload(input) {
     reader.readAsArrayBuffer(file);
   } else {
     const reader = new FileReader();
-    reader.onload = e => processText(e.target.result, file.name);
+    reader.onload = e => {
+      try {
+        processText(e.target.result, file.name);
+      } catch(err) {
+        console.error('processText error:', err);
+        statusEl.textContent = '⚠ Error: ' + (err.message || 'unknown error');
+        showToast('Parse error: ' + (err.message||'unknown'), true);
+      }
+    };
+    reader.onerror = () => { statusEl.textContent = '⚠ Could not read file'; };
     reader.readAsText(file);
   }
 }
