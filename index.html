@@ -1330,6 +1330,8 @@ VENDORS YOU WILL SEE:
 - Breakthru Beverage: columns Case | Btles | Item# | Size | BPC | CS Net | Ext W/O Tax. Case column has number = case order: qty=Case×BPC, unitCost=CS Net÷BPC, total=Ext W/O Tax. Btles column has number = bottle order: qty=Btles, unitCost=Ext W/O Tax÷Btles, total=Ext W/O Tax. Skip Service Fee lines.
 - Southern Glazer's: CS ORD/DLV and BTLS ORD/DLV columns — only one has a number per item. CS mode: UNIT NET = per-case price, unitCost = UNIT NET ÷ BPC, qty = CS × BPC. BTLS mode: UNIT NET = per-bottle price already, unitCost = UNIT NET directly, qty = BTLS. Verify mode by checking: if UNIT NET × BTLS = TOTAL it is BTLS mode; if UNIT NET × CS × BPC ≈ TOTAL it is CS mode. Skip COOK COUNTY ALCOHOL TAX, CHICAGO ALCOHOL EXCISE TAX, DELIVERY CHARGE lines.
 
+CREDIT INVOICES: If the document is a credit memo, return, or credit invoice (Net Total is negative, or header says "Credit", "Credit Memo", "Return"), set qty and total as NEGATIVE numbers. unitCost stays positive. Example: -1 case returned → qty: -12, unitCost: 11.25, total: -135.00.
+
 RULES:
 1. Return ONLY a JSON array, no other text.
 2. Each item: {"item": "product name", "qty": number, "unitCost": cost_per_unit, "total": line_total, "cat": category, "invoiceNumber": "...", "invoiceDate": "YYYY-MM-DD", "vendor": "vendor name"}
@@ -2266,16 +2268,20 @@ function renderPurchasesTable(){
   if(!purchases||!purchases.length){tbody.innerHTML='<tr><td colspan="9" class="empty-state">No purchases recorded yet</td></tr>';return;}
   tbody.innerHTML=[...purchases].reverse().map(p=>{
     const isXfr=!!p.transferId, isOut=p.transferDir==='out';
-    const rowStyle=isXfr?`background:rgba(${isOut?'192,57,43':'39,174,96'},0.04);`:'';
+    const isCredit = p.isCredit || p.total < 0 || p.qty < 0;
+    const rowStyle=isCredit?`background:rgba(39,174,96,0.04);`
+                  :isXfr?`background:rgba(${isOut?'192,57,43':'39,174,96'},0.04);`:'';
     const vendorHtml=isXfr
       ?`<span style="font-size:10px;color:${isOut?'var(--accent2)':'var(--green)'};">${escHtml(p.vendor||'—')}</span>`
       :escHtml(p.vendor||'—');
+    const creditBadge = isCredit ? `<span style="font-size:9px;background:rgba(39,174,96,0.15);color:var(--green);border-radius:3px;padding:1px 5px;margin-left:4px;font-family:var(--mono);">CREDIT</span>` : '';
     const costHtml=isOut?`<span style="color:var(--accent2);">${fmt$(p.cost)}</span>`:fmt$(p.cost);
-    const totalHtml=isOut?`<span style="color:var(--accent2);">${fmt$(p.total)}</span>`:fmt$(p.total);
+    const totalHtml=isCredit?`<span style="color:var(--green);">${fmt$(p.total)}</span>`
+                   :isOut?`<span style="color:var(--accent2);">${fmt$(p.total)}</span>`:fmt$(p.total);
     const delBtn=isXfr
       ?`<button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deleteTransfer('${p.transferId}')">✕</button>`
       :`<button class="btn btn-danger" style="padding:3px 9px;font-size:10px" onclick="deletePurchase('${p.id}')">✕</button>`;
-    return`<tr style="${rowStyle}"><td>${p.date}</td><td>${escHtml(p.item)}</td><td><span class="badge" style="background:rgba(212,168,67,0.1);color:var(--accent)">${p.cat}</span></td><td>${vendorHtml}</td><td class="num">${costHtml}</td><td class="num">${p.qty}</td><td class="num">${totalHtml}</td><td>${syncChip(p.synced)}</td><td>${delBtn}</td></tr>`;
+    return`<tr style="${rowStyle}"><td>${p.date}</td><td>${escHtml(p.item)}${creditBadge}</td><td><span class="badge" style="background:rgba(212,168,67,0.1);color:var(--accent)">${p.cat}</span></td><td>${vendorHtml}</td><td class="num">${costHtml}</td><td class="num">${p.qty}</td><td class="num">${totalHtml}</td><td>${syncChip(p.synced)}</td><td>${delBtn}</td></tr>`;
   }).join('');
 }
 
@@ -3163,25 +3169,29 @@ function confirmSingleBatch(ri) {
   const invNum = r.invoiceNumber || null;
 
   const items = r.items.filter(Boolean);
-  let added = 0;
+  let added = 0, credits = 0;
   items.forEach(item => {
-    const cost  = item.unitCost || item.cost || 0;
-    const qty   = item.qty || 1;
-    const total = item.total || (cost * qty);
+    const cost  = Math.abs(item.unitCost || item.cost || 0);
+    const qty   = (item.qty !== undefined && item.qty !== null && item.qty !== 0) ? item.qty : 1;
+    const total = (item.total !== undefined && item.total !== null) ? item.total : (cost * qty);
+    const isCredit = qty < 0 || total < 0;
     S().purchases.push({
       id: 'pur_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       date, item:item.item, cat:item.category||item.cat||'Other', cost, qty, total, vendor,
-      invoiceNumber: invNum, synced:false
+      invoiceNumber: invNum, synced:false, isCredit
     });
-    updatePriceHistory(item.item, item.category||item.cat||'Other', cost, date, invNum);
-    added++;
+    if (!isCredit) updatePriceHistory(item.item, item.category||item.cat||'Other', cost, date, invNum);
+    isCredit ? credits++ : added++;
   });
 
   if (invNum) S().invoiceNumbers = [...(S().invoiceNumbers||[]), invNum];
   saveLocal();
   scheduleSync();
   batchResults[ri].confirmed = true;
-  showToast(`✓ ${added} items added from ${r.fileName}`);
+  const msg = added && credits ? `✓ ${added} items · ${credits} credit${credits!==1?'s':''} added from ${r.fileName}`
+            : credits ? `✓ ${credits} credit${credits!==1?'s':''} added from ${r.fileName}`
+            : `✓ ${added} items added from ${r.fileName}`;
+  showToast(msg);
   renderBatchReview();
   renderPurchasesTable();
   renderRecentInvoices();
@@ -5952,7 +5962,8 @@ function handleAllLevelsUpload(input) {
     const beer    = Object.values(result.items).filter(v => ['Draft Beer','Bottled Beer'].includes(v.salesCat)).length;
     const spirits = Object.keys(result.modifiers).length;
     const totalOz = Object.values(result.modifiers).reduce((s,v) => s + v.totalOz, 0);
-    statusEl.textContent = `✓ ${liquor} liquor · ${beer} beer · ${spirits} spirits w/ pour data (${totalOz.toFixed(1)} oz) · Sales: $${totalSales.toFixed(0)} auto-filled`;
+    const spiritsNote = spirits > 0 ? `${spirits} spirits w/ exact pour data` : `no size modifiers found — using ${DEFAULT_POUR_OZ}oz default`;
+    statusEl.textContent = `✓ ${liquor} liquor · ${beer} beer · ${spiritsNote} · Sales: $${totalSales.toFixed(0)} auto-filled`;
     document.getElementById('upload-all-levels').classList.add('loaded');
     validateVariancePair();
     showToast(`✓ All Levels loaded — sales auto-filled: Liquor $${salesTotals.liquor.toFixed(0)} · Beer $${totalBeer.toFixed(0)} · Wine $${salesTotals.wine.toFixed(0)}`);
