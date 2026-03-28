@@ -7815,6 +7815,23 @@ function initApp(){
     localStorage.setItem('pourcost_sec', JSON.stringify(cleaned));
   } catch(e) { localStorage.removeItem('pourcost_sec'); }
   initSections();
+
+  // Wire drag-and-drop for all .upload-box elements
+  document.querySelectorAll('.upload-box').forEach(box => {
+    box.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); box.style.borderColor = 'var(--accent)'; box.style.background = 'rgba(212,168,67,0.05)'; });
+    box.addEventListener('dragleave', e => { box.style.borderColor = ''; box.style.background = ''; });
+    box.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation();
+      box.style.borderColor = ''; box.style.background = '';
+      const input = box.querySelector('input[type=file]');
+      if (!input || !e.dataTransfer.files.length) return;
+      // Create a new FileList-compatible transfer and assign to input
+      const dt = new DataTransfer();
+      Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
 }
 
 async function main(){
