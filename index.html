@@ -4018,56 +4018,73 @@ function parseLiquorInventorySheet(buffer_or_text, isText) {
 }
 
 // Parse keg/draft inventory sheet.
-// Keg rows: col A = product name, col B = fill level (0–1 decimal), col C = Backup (whole kegs waiting)
-// Package beer/mixer rows have integer totals just like liquor sheet — we include them too.
+// Layout has two sections:
+//   KEG section (rows 1-17):  col A=row#, col B=name, col C=fill level (0-1), col D=backup kegs, col E=keg price (ignore), col F=keg/gal (ignore), col G=distributor
+//   PACKAGE section (row 18+ header): col B=name, col C=CS PAR (ignore), col D=CS, col E=CS SIZE, col F=units, col G=TOTAL(cs), col H=order, col I=distributor
 // Returns array of { name, total, isKeg, fillLevel, backup }
 function parseKegInventorySheet(buffer_or_text, isText) {
-  let data = [];
+  let raw = [];
   if (isText) {
     const lines = buffer_or_text.split('\n').filter(l => l.trim());
-    data = lines.map(l => parseCsvLine(l).map(c => c.replace(/"/g,'').trim()));
-    if (!data.length) return [];
-    data = data.slice(1); // skip header
+    raw = lines.map(l => parseCsvLine(l).map(c => c.replace(/"/g,'').trim()));
   } else {
     if (typeof XLSX === 'undefined') return [];
     try {
       const wb = XLSX.read(buffer_or_text, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      // Skip to first row after header
-      let startRow = 1;
-      for (let i = 0; i < Math.min(8, raw.length); i++) {
-        const a = String(raw[i][0]||'').trim();
-        if (a && /^(product|item|name|keg|description)/i.test(a)) { startRow = i + 1; break; }
-      }
-      data = raw.slice(startRow).map(r => r.map(c => String(c||'').trim()));
+      raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      raw = raw.map(r => r.map(c => String(c||'').trim()));
     } catch(e) { console.error('Keg XLSX parse:', e); return []; }
   }
 
   const rows = [];
-  data.forEach(row => {
-    const name = String(row[0]||'').trim();
-    if (!name || /^(total|subtotal|grand|sum|product|item)/i.test(name)) return;
-    if (name.length < 2) return;
+  let inPackageSection = false;
 
-    const colB = parseFloat(String(row[1]||'').replace(/[$,%]/g,''));
-    const colC = parseFloat(String(row[2]||'').replace(/[$,%]/g,''));
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i];
+    const col0 = String(row[0]||'').trim();
+    const col1 = String(row[1]||'').trim();
 
-    // Detect keg: fill level is typically 0–1 decimal (e.g. 0.25, 0.5, 1.0)
-    // Package items have whole-number unit counts like 6, 12, 24
-    const isKeg = !isNaN(colB) && colB >= 0 && colB <= 1 && (String(row[1]||'').includes('.') || colB === 0 || colB === 1);
-    const backup = (!isNaN(colC) && colC > 0) ? colC : 0;
-
-    if (isKeg) {
-      // total = fill_level + backup whole kegs (each backup keg = 1.0)
-      const total = (isNaN(colB) ? 0 : colB) + backup;
-      rows.push({ name, total, isKeg: true, fillLevel: isNaN(colB)?0:colB, backup });
-    } else {
-      // Package item — col B is just a quantity count
-      const total = isNaN(colB) ? 0 : colB;
-      if (total > 0) rows.push({ name, total, isKeg: false, fillLevel: null, backup: 0 });
+    // Detect PACKAGE section header row
+    if (col1.toUpperCase() === 'PACKAGE' || (col1.toUpperCase().includes('PACKAGE') && String(row[2]||'').toUpperCase().includes('PAR'))) {
+      inPackageSection = true;
+      continue;
     }
-  });
+
+    // Stop at Back Up Kegs section
+    if (col0.toLowerCase().includes('back up') || col1.toLowerCase().includes('back up')) break;
+
+    if (inPackageSection) {
+      // Package row: col B=name, col D=CS (cases), col E=CS SIZE, col F=loose units, col G=TOTAL(cs decimal)
+      const name = col1;
+      if (!name || name.length < 2) continue;
+      const cs       = parseFloat(String(row[3]||'').replace(/[$,%]/g,'')) || 0;  // col D
+      const csSize   = parseFloat(String(row[4]||'').replace(/[$,%]/g,'')) || 24; // col E
+      const units    = parseFloat(String(row[5]||'').replace(/[$,%]/g,'')) || 0;  // col F
+      const totalCs  = parseFloat(String(row[6]||'').replace(/[$,%]/g,''));       // col G — TOTAL(cs) formula result
+      // Use the pre-calculated decimal total if available, otherwise compute it
+      const total = (!isNaN(totalCs) && totalCs > 0) ? totalCs : ((cs * csSize + units) / csSize);
+      if (total > 0) rows.push({ name, total, isKeg: false, fillLevel: null, backup: 0 });
+
+    } else {
+      // Keg row: col A=row#, col B=name, col C=fill level, col D=backup
+      const name = col1;
+      if (!name || name.length < 2) continue;
+      if (/^(total|subtotal|grand|product|item|name|keg\s+price|keg\/gal|distribut)/i.test(name)) continue;
+
+      const colC = parseFloat(String(row[2]||'').replace(/[$,%]/g,''));
+      const colD = parseFloat(String(row[3]||'').replace(/[$,%]/g,''));
+      // col E = keg price (ignore per instructions), col F = keg/gal (ignore)
+
+      const isKeg = !isNaN(colC) && colC >= 0 && colC <= 1;
+      const backup = (!isNaN(colD) && colD > 0) ? colD : 0;
+
+      if (isKeg) {
+        const total = (isNaN(colC) ? 0 : colC) + backup;
+        rows.push({ name, total, isKeg: true, fillLevel: isNaN(colC)?0:colC, backup });
+      }
+    }
+  }
   return rows;
 }
 
