@@ -1656,6 +1656,7 @@ RULES:
 3. cases/btles/bpc=0 for Lakeshore/CBS vendors.
 4. Categories: Spirits, Beer, Wine, Mixers, Keg, Other. Seltzers/canned cocktails=Beer. Draft kegs=Keg.
 5. Skip deposit returns, tax lines, delivery charges, service fees, $0 lines.
+6. CREDIT INVOICES: If this is a credit memo, credit summary, or return (look for "Credit Summary", "Credit Memo", negative Net Total, or all quantities shown as negative), set qty and total as NEGATIVE numbers. Keep unitCost positive. For Southern Glazer's Proof credits: invoiceNumber = Document Number (e.g. 9003616), qty = negative bottles (e.g. -1 case of 12 = qty -12), total = negative Net Amount. Example: -1 Cases of 12-pack at $11.25/btl → qty:-12, unitCost:11.25, total:-135.00.
 
 Return only the JSON array.`;
 
@@ -3092,11 +3093,15 @@ function renderBatchReview() {
 
   list.innerHTML = batchResults.map((r, ri) => {
     const invTotal = r.items.reduce((s,it)=>s+(it.total||0),0);
-    const statusColor = r.error||r.items.length===0 ? 'var(--accent2)' : 'var(--green)';
+    const isCredit = invTotal < 0 || r.items.some(it => it.qty < 0 || it.total < 0);
+    const statusColor = r.error||r.items.length===0 ? 'var(--accent2)' : isCredit ? 'var(--green)' : 'var(--green)';
     const statusIcon  = r.error||r.items.length===0 ? '✗' : '✓';
+    const creditTag   = isCredit ? `<span style="font-family:var(--mono);font-size:9px;background:rgba(39,174,96,0.15);color:var(--green);border-radius:3px;padding:2px 6px;margin-left:6px;">CREDIT</span>` : '';
 
-    const itemRows = r.items.map((item, idx) => `
-      <tr id="batch-row-${ri}-${idx}">
+    const itemRows = r.items.map((item, idx) => {
+      const itemIsCredit = item.qty < 0 || item.total < 0;
+      return `
+      <tr id="batch-row-${ri}-${idx}" style="${itemIsCredit?'background:rgba(39,174,96,0.04);':''}">
         <td><input value="${escHtml(item.item||'')}" oninput="batchResults[${ri}].items[${idx}].item=this.value"
           style="width:100%;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;"></td>
         <td><select onchange="batchResults[${ri}].items[${idx}].category=this.value;batchResults[${ri}].items[${idx}].cat=this.value"
@@ -3106,15 +3111,15 @@ function renderBatchReview() {
         <td style="text-align:right;"><input type="number" value="${(item.cost||item.unitCost||0).toFixed(2)}"
           oninput="batchResults[${ri}].items[${idx}].cost=parseFloat(this.value)||0;batchResults[${ri}].items[${idx}].unitCost=parseFloat(this.value)||0"
           style="width:70px;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;text-align:right;"></td>
-        <td style="text-align:right;"><input type="number" value="${item.qty||1}"
+        <td style="text-align:right;color:${itemIsCredit?'var(--green)':'var(--text)'};"><input type="number" value="${item.qty||1}"
           oninput="batchResults[${ri}].items[${idx}].qty=parseFloat(this.value)||1"
-          style="width:50px;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:11px;text-align:right;"></td>
-        <td style="text-align:right;" id="batch-total-${ri}-${idx}">${fmt$((item.total)||(item.cost||item.unitCost||0)*(item.qty||1))}</td>
+          style="width:50px;background:transparent;border:none;color:inherit;font-family:var(--mono);font-size:11px;text-align:right;"></td>
+        <td style="text-align:right;color:${itemIsCredit?'var(--green)':'var(--text)'};" id="batch-total-${ri}-${idx}">${fmt$((item.total)||(item.cost||item.unitCost||0)*(item.qty||1))}</td>
         <td style="text-align:right;">
           <button onclick="batchResults[${ri}].items.splice(${idx},1);renderBatchReview()"
             style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;">✕</button>
         </td>
-      </tr>`).join('');
+      </tr>`}).join('');
 
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;">
       <!-- Invoice header -->
@@ -3122,8 +3127,8 @@ function renderBatchReview() {
            onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
         <div style="font-size:16px;color:${statusColor};">${statusIcon}</div>
         <div style="flex:1;min-width:120px;">
-          <div style="font-family:var(--mono);font-size:12px;font-weight:600;">${escHtml(r.fileName)}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${r.source} · ${r.items.length} items · ${fmt$(invTotal)}</div>
+          <div style="font-family:var(--mono);font-size:12px;font-weight:600;">${escHtml(r.fileName)}${creditTag}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${r.source} · ${r.items.length} items · <span style="color:${isCredit?'var(--green)':'var(--text)'}">${fmt$(invTotal)}</span></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" onclick="event.stopPropagation()">
           <input type="text" value="${escHtml(r.vendor||'')}" placeholder="Vendor"
