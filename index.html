@@ -1512,6 +1512,14 @@ function loadLocal() {
     config.scriptUrl = 'https://script.google.com/macros/s/AKfycbwa3OeYdif096GcKWWYm9x_UyIhe3_zCyExgLXg9d6wiLIyQM19owSKn8bccakbIPMhJw/exec';
     const ls = localStorage.getItem('pourcost_last_sync');
     if (ls) lastSyncTime = new Date(ls);
+    // Sanitize: ensure all array fields are actually arrays after merge
+    ['dh','lh'].forEach(b => {
+      const st = states[b];
+      ['weeks','purchases','posItems','menuItems','wasteLogs','depletions',
+       'ignoredPosItems','invoiceNumbers','transfers','submissionLog','productMaps'].forEach(k => {
+        if (!Array.isArray(st[k])) st[k] = [];
+      });
+    });
   } catch(e) {}
 }
 
@@ -2574,12 +2582,12 @@ function collectUnresolvedConnections(barId) {
   const ignored = new Set(st.ignoredPosItems || []);
 
   // 1. POS items with no product map match
-  const posUnresolved = [...new Set(st.posItems || [])]
+  const posUnresolved = [...new Set(Array.isArray(st.posItems) ? st.posItems : [])]
     .filter(n => !ignored.has(n) && !resolveProduct(n, bid));
 
   // 2. Inventory items with no price history AND no saved mapping
   // We pull these from a separate list we track when items come in unpriced
-  const invUnresolved = [...new Set(st.unresolvedInvItems || [])];
+  const invUnresolved = [...new Set(Array.isArray(st.unresolvedInvItems) ? st.unresolvedInvItems : [])];
 
   const total = posUnresolved.length + invUnresolved.length;
   return { pos: posUnresolved, inv: invUnresolved, total };
@@ -5783,6 +5791,7 @@ function dateRangesMatch(rangeA, rangeB) {
 // Works with both standalone CSV and the "All levels.csv" extracted from a Product Mix zip
 // Returns { items: {name:{salesCat,qtySold}}, modifiers: {spiritLower:{name,totalOz,breakdown}} }
 function parseAllLevelsCSV(text) {
+  text = text.replace(/\r/g, '');  // normalize CRLF → LF
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return null;
 
@@ -5809,6 +5818,8 @@ function parseAllLevelsCSV(text) {
   const colGroup   = ci('menu group');        // present in zip export
   const colNet     = ci('net sales');
   if (colType < 0 || colName < 0 || colQty < 0) return null;
+  console.log('parseAllLevels cols:', {colType,colName,colQty,colSize,colCat,colNet,colMenu,colGroup});
+  console.log('header sample:', headers.slice(0,15));
 
   // Derive sales category from either the Sales Category column or Menu/Menu group
   const getSalesCat = (row) => {
@@ -5862,6 +5873,7 @@ function parseAllLevelsCSV(text) {
 
   const hasItems = Object.keys(items).length > 0;
   const hasMods  = Object.keys(modifiers).length > 0;
+  console.log('parseAllLevels result:', {itemCount: Object.keys(items).length, modCount: Object.keys(modifiers).length});
   return (hasItems || hasMods) ? { items, modifiers } : null;
 }
 
@@ -5917,7 +5929,7 @@ function handleAllLevelsUpload(input) {
     // Trigger Connections review for any new item names not yet mapped
     const newItems = Object.keys(result.items);
     if (newItems.length > 0) {
-      if (!S().posItems) S().posItems = [];
+      if (!Array.isArray(S().posItems)) S().posItems = [];
       newItems.forEach(n => { if (!S().posItems.includes(n)) S().posItems.push(n); });
       saveLocal();
       updateConnectionsBadge();
