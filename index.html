@@ -5809,17 +5809,24 @@ function parseAllLevelsCSV(text) {
 
   const headers = parseRow(lines[0]).map(h => h.replace(/"/g,'').toLowerCase().trim());
   const ci = k => headers.findIndex(h => h.includes(k));
-  const colType    = headers.indexOf('type');
-  const colName    = ci('item, open item');
-  const colQty     = ci('qty sold');
-  const colSize    = ci('size modifier');
-  const colCat     = ci('sales category');   // present in standalone CSV export
-  const colMenu    = headers.indexOf('menu'); // present in zip export
-  const colGroup   = ci('menu group');        // present in zip export
-  const colNet     = ci('net sales');
-  if (colType < 0 || colName < 0 || colQty < 0) return null;
-  console.log('parseAllLevels cols:', {colType,colName,colQty,colSize,colCat,colNet,colMenu,colGroup});
-  console.log('header sample:', headers.slice(0,15));
+  const colType = headers.indexOf('type');
+  // "Item, open item" is a quoted field with a comma — find it robustly
+  const colName = ci('item, open item') >= 0 ? ci('item, open item')
+                : ci('open item')       >= 0 ? ci('open item')
+                : ci('item name')       >= 0 ? ci('item name')
+                : headers.findIndex(h => h === 'item');
+  const colQty  = ci('qty sold') >= 0 ? ci('qty sold') : ci('qty');
+  const colSize = ci('size modifier');
+  const colCat  = ci('sales category');
+  const colMenu = headers.indexOf('menu');
+  const colGroup= ci('menu group');
+  const colNet  = ci('net sales');
+  console.log('All Levels headers:', JSON.stringify(headers));
+  console.log('Cols:', {colType, colName, colQty, colSize, colCat, colNet});
+  if (colType < 0 || colName < 0 || colQty < 0) {
+    console.error('Missing cols — type:'+colType+' name:'+colName+' qty:'+colQty);
+    return null;
+  }
 
   // Derive sales category from either the Sales Category column or Menu/Menu group
   const getSalesCat = (row) => {
